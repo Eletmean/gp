@@ -1,0 +1,115 @@
+.in-development-container {
+  min-height: calc(100vh - 200px);
+  display: flex;
+  align-items: flex-start;
+  padding: 60px 20px;
+  color: white;
+}
+
+.in-development-content {
+  max-width: 500px;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  text-align: left;
+}
+
+.icon {
+  display: none; /* Скрываем иконку */
+}
+
+.in-development-content h1 {
+  font-size: 48px;
+  margin-bottom: 10px;
+  background: none;
+  color: white;
+  font-weight: 300;
+  letter-spacing: -1px;
+  -webkit-text-fill-color: white; /* Убираем градиент */
+}
+
+.subtitle {
+  font-size: 18px;
+  color: #888;
+  margin-bottom: 40px;
+  font-weight: 300;
+}
+
+.description {
+  display: none; /* Скрываем описание */
+}
+
+.progress-container {
+  display: none; /* Скрываем прогресс-бар */
+}
+
+.back-button {
+  margin-top: 30px;
+}
+
+.back-link {
+  display: inline-block;
+  padding: 12px 30px;
+  background: transparent;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: 400;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.back-link:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: none;
+  box-shadow: none;
+}
+
+.back-link:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .in-development-container {
+    padding: 40px 20px;
+  }
+  
+  .in-development-content h1 {
+    font-size: 36px;
+  }
+  
+  .subtitle {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .in-development-content h1 {
+    font-size: 32px;
+  }
+  
+  .back-link {
+    padding: 10px 24px;
+    font-size: 15px;
+  }
+}
+
+/* Убираем стили для элементов, которых больше нет */
+.in-development-content .subtitle,
+.in-development-content .description {
+  margin-bottom: 0;
+}
+
+/* Убираем ненужные градиенты */
+.back-link {
+  background: transparent !important;
+  background-image: none !important;
+}
