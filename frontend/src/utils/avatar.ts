@@ -6,7 +6,7 @@
  * @returns полный URL для отображения
  */
 export const getAvatarUrl = (avatar?: string | null): string => {
-  const DEFAULT_AVATAR = '/images/default-avatar.svg'; // или '/default-avatar.png'
+  const DEFAULT_AVATAR = '/images/default-avatar.svg';
   
   if (!avatar) {
     return DEFAULT_AVATAR;
@@ -17,13 +17,13 @@ export const getAvatarUrl = (avatar?: string | null): string => {
     return avatar;
   }
   
-  // Если аватар локальный (начинается с /)
-  if (avatar.startsWith('/')) {
-    return avatar;
+  // Если аватар из бэкенда (начинается с /static/)
+  if (avatar.startsWith('/static/')) {
+    // Заменяем /static/ на /backend-static/
+    return avatar.replace('/static/', '/backend-static/');
   }
   
-  // Если аватар из API (относительный путь)
-  return `http://localhost:8000${avatar}`;
+  return avatar;
 };
 
 /**
@@ -32,6 +32,7 @@ export const getAvatarUrl = (avatar?: string | null): string => {
  */
 export const handleImageError = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
   const target = event.target as HTMLImageElement;
-  target.src = '/images/default-avatar.svg'; // или '/default-avatar.png'
-  target.onerror = null; // предотвращаем бесконечный цикл
+  console.error('Failed to load image:', target.src);
+  target.src = '/images/default-avatar.svg';
+  target.onerror = null;
 };

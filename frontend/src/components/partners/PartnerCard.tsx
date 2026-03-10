@@ -19,18 +19,28 @@ interface PartnerCardProps {
   partner: Partner;
   onSendRequest: (id: string) => void;
   onRemoveFriend: (id: string) => void;
+  isAuthenticated: boolean; // Добавили пропс
 }
 
 const PartnerCard: React.FC<PartnerCardProps> = ({ 
   partner, 
   onSendRequest, 
-  onRemoveFriend 
+  onRemoveFriend,
+  isAuthenticated 
 }) => {
   const getFullName = () => {
     return `${partner.first_name} ${partner.last_name}`;
   };
 
   const renderActionButton = () => {
+    if (!isAuthenticated) {
+      return (
+        <Link to="/login" className="btn btn-primary btn-sm">
+          Войдите чтобы добавить
+        </Link>
+      );
+    }
+
     if (partner.is_friend) {
       return (
         <button 
@@ -82,17 +92,20 @@ const PartnerCard: React.FC<PartnerCardProps> = ({
         
         {partner.favorite_game && (
           <div className="partner-favorite-game">
-            <span className="game-label">Любимая игра:</span>
             <span className="game-name">{partner.favorite_game}</span>
           </div>
         )}
       </div>
 
       <div className="partner-card-footer">
-        {renderActionButton()}
-        <Link to={`/partner/${partner.id}`} className="btn btn-outline btn-sm">
-          Перейти в профиль
-        </Link>
+        <div className="footer-left">
+          {renderActionButton()}
+        </div>
+        <div className="footer-right">
+          <Link to={`/partner/${partner.id}`} className="btn btn-outline btn-sm">
+            Перейти в профиль
+          </Link>
+        </div>
       </div>
     </div>
   );

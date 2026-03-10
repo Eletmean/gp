@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authAPI, gamesAPI } from '../services/api';
+import { authAPI, gamesAPI, usersAPI } from '../services/api';
 import type { UserProfile, UserGame } from '../services/api';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
@@ -20,6 +20,7 @@ const EditProfile: React.FC = () => {
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   const [formData, setFormData] = useState({
@@ -35,6 +36,8 @@ const EditProfile: React.FC = () => {
   const [userGames, setUserGames] = useState<UserGame[]>([]);
   const [allGames, setAllGames] = useState<Game[]>([]);
   const [loadingGames, setLoadingGames] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedGameToAdd, setSelectedGameToAdd] = useState<number | ''>('');
 
   useEffect(() => {
     fetchProfile();
@@ -58,7 +61,6 @@ const EditProfile: React.FC = () => {
         setAvatarPreview(userData.avatar);
       }
 
-      // Загружаем игры пользователя
       await fetchUserGames();
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -122,12 +124,16 @@ const EditProfile: React.FC = () => {
     }
   };
 
-  const handleAddGame = async (gameId: number) => {
+  const handleAddGame = async () => {
+    if (!selectedGameToAdd) return;
+    
     try {
-      await gamesAPI.addUserGame({ game_id: gameId, hours_played: 0 });
+      await gamesAPI.addUserGame({ game_id: Number(selectedGameToAdd), hours_played: 0 });
       await fetchUserGames();
+      setSelectedGameToAdd(''); // Сбрасываем выбор после добавления
     } catch (error) {
       console.error('Error adding game:', error);
+      alert('Ошибка при добавлении игры');
     }
   };
 
@@ -137,6 +143,7 @@ const EditProfile: React.FC = () => {
       await fetchUserGames();
     } catch (error) {
       console.error('Error removing game:', error);
+      alert('Ошибка при удалении игры');
     }
   };
 
@@ -208,6 +215,22 @@ const EditProfile: React.FC = () => {
 
   const handleCancel = () => {
     navigate('/profile');
+  };
+
+  const handleDeleteProfile = async () => {
+    setDeleting(true);
+    try {
+      await usersAPI.deleteProfile();
+      localStorage.clear();
+      navigate('/');
+      alert('Ваш профиль был успешно удален');
+    } catch (error: any) {
+      console.error('Error deleting profile:', error);
+      alert(error.response?.data?.detail || 'Ошибка при удалении профиля');
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   // Доступные для добавления игры (которых нет у пользователя)
@@ -362,7 +385,7 @@ const EditProfile: React.FC = () => {
                               className="remove-game-btn"
                               onClick={() => handleRemoveGame(userGame.id)}
                             >
-                              ✕
+                              Удалить
                             </button>
                           </div>
                         ))}
@@ -370,30 +393,36 @@ const EditProfile: React.FC = () => {
                     )}
                   </div>
                   
-                  {/* Доступные игры */}
-                  {loadingGames ? (
-                    <p>Загрузка игр...</p>
-                  ) : availableGames.length > 0 && (
-                    <div className="available-games-section">
-                      <h4 className="available-games-title">Добавить игру</h4>
-                      <div className="available-games-grid">
+                  {/* Добавление игры - выпадающий список */}
+                  <div className="add-game-section">
+                    <h4 className="add-game-title">Добавить игру</h4>
+                    <div className="add-game-controls">
+                      <select
+                        value={selectedGameToAdd}
+                        onChange={(e) => setSelectedGameToAdd(e.target.value ? Number(e.target.value) : '')}
+                        className="form-select add-game-select"
+                        disabled={loadingGames || availableGames.length === 0}
+                      >
+                        <option value="">Выберите игру</option>
                         {availableGames.map(game => (
-                          <div key={game.id} className="available-game-card">
-                            <div className="available-game-content">
-                              <span className="game-name">{game.name}</span>
-                            </div>
-                            <button 
-                              type="button"
-                              className="add-game-from-list-btn"
-                              onClick={() => handleAddGame(game.id)}
-                            >
-                              +
-                            </button>
-                          </div>
+                          <option key={game.id} value={game.id}>
+                            {game.name}
+                          </option>
                         ))}
-                      </div>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleAddGame}
+                        disabled={!selectedGameToAdd || loadingGames}
+                        className="add-game-submit-btn"
+                      >
+                        Добавить
+                      </button>
                     </div>
-                  )}
+                    {availableGames.length === 0 && !loadingGames && (
+                      <p className="no-games-message">Все игры уже добавлены</p>
+                    )}
+                  </div>
                 </div>
                 
                 {/* Form actions */}
@@ -414,11 +443,66 @@ const EditProfile: React.FC = () => {
                     {saving ? 'Сохранение...' : 'Сохранить изменения'}
                   </button>
                 </div>
+
+                {/* Delete account section */}
+                <div className="delete-account-section">
+                  <h3 className="section-title delete-title">Удаление аккаунта</h3>
+                  <div className="delete-account-content">
+                    <p className="delete-warning">
+                      Это действие необратимо. Все ваши данные будут безвозвратно удалены.
+                    </p>
+                    <button 
+                      type="button"
+                      className="delete-account-btn"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      disabled={deleting}
+                    >
+                      {deleting ? 'Удаление...' : 'Удалить аккаунт'}
+                    </button>
+                  </div>
+                </div>
               </form>
             )}
           </div>
         </div>
       </main>
+
+      {/* Модалка подтверждения удаления */}
+      {showDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal-content delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Подтверждение удаления</h2>
+              <button 
+                className="modal-close"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className="delete-confirm-content">
+              <p className="delete-confirm-warning">
+                Вы уверены, что хотите удалить свой аккаунт? Это действие необратимо.
+              </p>
+              <div className="delete-confirm-actions">
+                <button 
+                  className="btn btn-secondary"
+                  onClick={() => setShowDeleteConfirm(false)}
+                >
+                  Отмена
+                </button>
+                <button 
+                  className="btn btn-danger"
+                  onClick={handleDeleteProfile}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Удаление...' : 'Да, удалить аккаунт'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <Footer />
     </div>

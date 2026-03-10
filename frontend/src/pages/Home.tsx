@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
 import GamesCarousel from '../components/common/GamesCarousel';
-import ProfileCard from '../components/profiles/ProfileCard';
+import PartnerCard from '../components/partners/PartnerCard';
 import { partnersAPI, gamesAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/Home.css';
 
 interface Game {
@@ -13,19 +14,16 @@ interface Game {
   color?: string;
 }
 
-interface Profile {
-  id: number;
-  user: {
-    id: number;
-    username: string;
-    avatar_url?: string;
-  };
-  rating?: number;
-  rank?: string;
-  playtime?: number;
-  followers_count?: number;
-  favorite_game?: string | null;
-  bio?: string;
+interface Partner {
+  id: string;
+  username: string;
+  first_name: string;
+  last_name: string;
+  bio: string;
+  avatar: string;
+  favorite_game: string | null;
+  is_friend: boolean;
+  friendship_status: 'pending' | 'accepted' | 'rejected' | null;
 }
 
 interface Filters {
@@ -36,7 +34,8 @@ interface Filters {
 }
 
 const Home: React.FC = () => {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const { isAuthenticated } = useAuth();
+  const [profiles, setProfiles] = useState<Partner[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [filters, setFilters] = useState<Filters>({
@@ -47,12 +46,10 @@ const Home: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState<boolean>(false);
 
-  // Загрузка игр для фильтров
   useEffect(() => {
     loadGames();
   }, []);
 
-  // Загрузка профилей
   useEffect(() => {
     loadProfiles();
   }, []);
@@ -60,7 +57,6 @@ const Home: React.FC = () => {
   const loadGames = async () => {
     try {
       const response = await gamesAPI.getAllGames();
-      // Добавляем цвета для игр (как в твоём примере)
       const gamesWithColors = response.data.map((game, index) => ({
         ...game,
         color: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FF4757', '#FFA502'][index % 6]
@@ -75,22 +71,8 @@ const Home: React.FC = () => {
     try {
       setLoading(true);
       const response = await partnersAPI.getAll();
-      // Преобразуем данные из API в формат Profile
-      const formattedProfiles = response.data.map((partner: any, index: number) => ({
-        id: index + 1,
-        user: {
-          id: index + 1,
-          username: partner.username,
-          avatar_url: partner.avatar
-        },
-        favorite_game: partner.favorite_game,
-        bio: partner.bio,
-        rating: 4.5,
-        rank: 'intermediate',
-        playtime: 100,
-        followers_count: 50
-      }));
-      setProfiles(formattedProfiles);
+      console.log('Загруженные партнеры:', response.data);
+      setProfiles(response.data);
     } catch (error) {
       console.error('Error loading profiles:', error);
     } finally {
@@ -120,14 +102,54 @@ const Home: React.FC = () => {
 
   const hasActiveFilters = filters.search || filters.game || filters.rank || filters.sortBy !== 'rating';
 
+  const handleSendFriendRequest = async (partnerId: string) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      alert('Чтобы добавить в друзья, нужно войти в систему');
+      return;
+    }
+
+    try {
+      await partnersAPI.sendFriendRequest(partnerId);
+      setProfiles(prev => prev.map(p => 
+        p.id === partnerId ? { ...p, friendship_status: 'pending' } : p
+      ));
+    } catch (err: any) {
+      console.error('Error sending friend request:', err);
+      alert(err.response?.data?.detail || 'Ошибка при отправке запроса');
+    }
+  };
+
+  const handleRemoveFriend = async (partnerId: string) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      alert('Чтобы удалить из друзей, нужно войти в систему');
+      return;
+    }
+
+    try {
+      await partnersAPI.removeFriend(partnerId);
+      setProfiles(prev => prev.map(p => 
+        p.id === partnerId ? { ...p, is_friend: false, friendship_status: null } : p
+      ));
+    } catch (err: any) {
+      console.error('Error removing friend:', err);
+      alert(err.response?.data?.detail || 'Ошибка при удалении из друзей');
+    }
+  };
+
+  const handleVideoButtonClick = () => {
+    console.log('Кнопка видео нажата');
+    // Здесь потом будет логика открытия видео
+    alert('Функция открытия видео будет добавлена позже');
+  };
+
   return (
     <div className="page-wrapper">
       <Header />
       
       <main className="main-content">
-        {/* Основной контент с отступами по бокам */}
         <div className="content-container">
-          {/* Широкий темный баннер */}
           <section className="main-banner">
             <div className="banner-content">
               <h1 className="banner-title">
@@ -139,7 +161,6 @@ const Home: React.FC = () => {
             </div>
           </section>
 
-          {/* Рекламные баннеры */}
           <section className="ad-banners-row">
             <div className="ad-banner large">
               <div className="ad-placeholder">
@@ -161,14 +182,11 @@ const Home: React.FC = () => {
             </div>
           </section>
 
-          {/* Карусель игр */}
           <GamesCarousel />
 
-          {/* Поиск и фильтры */}
           <section className="filters-section">
             <div className="filters-header">
               <div className="search-box compact">
-                <span className="search-icon">🔍</span>
                 <input
                   type="text"
                   placeholder="Поиск по нику, игре..."
@@ -183,26 +201,22 @@ const Home: React.FC = () => {
                   className={`filter-toggle ${showFilters ? 'active' : ''}`}
                   onClick={() => setShowFilters(!showFilters)}
                 >
-                  <span className="filter-icon">⚙️</span>
                   Фильтры
                   {hasActiveFilters && <span className="filter-badge"></span>}
                 </button>
                 
                 {hasActiveFilters && (
                   <button className="clear-filters" onClick={clearAllFilters}>
-                    <span className="filter-icon">✕</span>
                     Сбросить
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Расширенные фильтры */}
             {showFilters && (
               <div className="filters-expanded">
                 <div className="filters-grid compact">
                   <div className="filter-group compact">
-                    <span className="filter-icon">🎮</span>
                     <select 
                       value={filters.game}
                       onChange={(e) => handleFilterChange('game', e.target.value)}
@@ -218,7 +232,6 @@ const Home: React.FC = () => {
                   </div>
 
                   <div className="filter-group compact">
-                    <span className="filter-icon">↕️</span>
                     <select 
                       value={filters.sortBy}
                       onChange={(e) => handleFilterChange('sortBy', e.target.value)}
@@ -233,7 +246,6 @@ const Home: React.FC = () => {
                   </div>
 
                   <div className="filter-group compact">
-                    <span className="filter-icon">🏆</span>
                     <select 
                       value={filters.rank}
                       onChange={(e) => handleFilterChange('rank', e.target.value)}
@@ -251,7 +263,6 @@ const Home: React.FC = () => {
               </div>
             )}
 
-            {/* Активные фильтры */}
             {hasActiveFilters && (
               <div className="active-filters compact">
                 {filters.search && (
@@ -288,7 +299,6 @@ const Home: React.FC = () => {
             )}
           </section>
 
-          {/* Профили игроков */}
           <section className="profiles-section">
             <div className="section-header">
               <h2 className="section-title">
@@ -312,13 +322,27 @@ const Home: React.FC = () => {
             ) : (
               <div className="profiles-grid">
                 {profiles.map(profile => (
-                  <ProfileCard key={profile.id} profile={profile} />
+                  <PartnerCard
+                    key={profile.id}
+                    partner={profile}
+                    onSendRequest={handleSendFriendRequest}
+                    onRemoveFriend={handleRemoveFriend}
+                    isAuthenticated={isAuthenticated}
+                  />
                 ))}
               </div>
             )}
           </section>
         </div>
       </main>
+
+      <button 
+        className="video-floating-btn"
+        onClick={handleVideoButtonClick}
+        aria-label="Открыть видео"
+      >
+        <span className="video-icon">▶</span>
+      </button>
       
       <Footer />
     </div>

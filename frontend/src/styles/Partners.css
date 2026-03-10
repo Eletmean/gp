@@ -1,4 +1,4 @@
-/* Partners.css - в том же стиле что и Games.css */
+/* Partners.css - полная версия */
 
 .partners-page {
   max-width: 1200px;
@@ -140,7 +140,7 @@
 /* Сетка партнеров */
 .partners-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 25px;
   margin-bottom: 40px;
 }
@@ -156,6 +156,7 @@
   flex-direction: column;
   height: auto;
   min-height: 380px;
+  position: relative;
 }
 
 .partner-card:hover {
@@ -164,55 +165,41 @@
   border-color: var(--accent-purple);
 }
 
-/* Шапка карточки с аватаром */
+/* Шапка карточки */
 .partner-card-header {
-  background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-purple-light) 100%);
-  padding: 25px 20px 20px;
+  padding: 20px 20px 15px;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 15px;
   flex-shrink: 0;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.partner-avatar-container {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 3px solid white;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  flex-shrink: 0;
-  background: white;
-}
-
+/* Аватар - увеличен до 80px */
 .partner-avatar {
-  width: 100%;
-  height: 100%;
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
   object-fit: cover;
+  border: 2px solid var(--accent-purple);
+  box-shadow: 0 4px 10px rgba(108, 99, 255, 0.3);
+  transition: transform 0.3s ease;
 }
 
-.partner-avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-purple-light) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 2rem;
-  font-weight: bold;
+.partner-card:hover .partner-avatar {
+  transform: scale(1.05);
 }
 
-.partner-header-info {
+.partner-info {
   flex: 1;
   min-width: 0;
 }
 
 .partner-name {
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   font-weight: 600;
-  margin-bottom: 4px;
-  color: white;
+  margin: 0 0 4px 0;
+  color: var(--text-primary);
   line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
@@ -221,7 +208,7 @@
 
 .partner-username {
   font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -229,16 +216,16 @@
 
 /* Тело карточки */
 .partner-card-body {
-  padding: 20px;
+  padding: 15px 20px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 12px;
 }
 
 .partner-bio {
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   line-height: 1.5;
   margin: 0;
   display: -webkit-box;
@@ -248,54 +235,60 @@
   min-height: 60px;
 }
 
+/* Любимая игра - без текста "Любимая игра:" */
 .partner-favorite-game {
-  background: var(--secondary-bg);
-  padding: 12px;
-  border-radius: 12px;
-  display: flex;
+  background: linear-gradient(135deg, rgba(108, 99, 255, 0.1) 0%, rgba(108, 99, 255, 0.05) 100%);
+  padding: 8px 15px;
+  border-radius: 30px;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  border: 1px solid var(--border-color);
+  border: 1px solid rgba(108, 99, 255, 0.2);
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 5px;
 }
 
-.game-icon {
-  color: var(--accent-purple);
-  font-size: 1.2rem;
-}
-
-.favorite-game-label {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  margin-right: 5px;
-}
-
-.favorite-game-name {
+.game-name {
   color: var(--accent-purple);
   font-weight: 600;
   font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Подвал карточки с кнопками */
 .partner-card-footer {
-  padding: 0 20px 20px;
+  padding: 15px 20px 20px;
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
   flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  background: var(--secondary-bg);
 }
 
-.partner-btn {
-  flex: 1;
-  min-width: 120px;
-  padding: 10px 15px;
+.footer-left, .footer-right {
+  display: flex;
+  align-items: center;
+}
+
+.btn {
+  padding: 10px 16px;
   font-size: 0.9rem;
-  border-radius: 10px;
+  border-radius: 30px;
   text-align: center;
   text-decoration: none;
   transition: all 0.3s ease;
   cursor: pointer;
   border: none;
   font-weight: 500;
+  display: inline-block;
+}
+
+.btn-sm {
+  padding: 8px 14px;
+  font-size: 0.85rem;
 }
 
 .btn-primary {
@@ -388,7 +381,7 @@
   background: var(--accent-purple);
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: 30px;
   font-size: 1rem;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -441,7 +434,7 @@
   }
   
   .partners-grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 20px;
     margin-bottom: 30px;
   }
@@ -451,25 +444,26 @@
   }
   
   .partner-card-header {
-    padding: 20px 15px;
+    padding: 15px 15px 10px;
   }
   
-  .partner-avatar-container {
-    width: 60px;
-    height: 60px;
+  .partner-avatar {
+    width: 70px;
+    height: 70px;
+    border-radius: 10px;
   }
   
   .partner-name {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
   }
   
   .partner-card-footer {
-    padding: 0 15px 15px;
-    flex-direction: column;
+    padding: 12px 15px 15px;
   }
   
-  .partner-btn {
-    width: 100%;
+  .btn-sm {
+    padding: 7px 12px;
+    font-size: 0.8rem;
   }
 }
 
@@ -501,16 +495,17 @@
   }
   
   .partner-card-header {
-    padding: 15px 12px;
+    padding: 12px 12px 8px;
   }
   
-  .partner-avatar-container {
-    width: 50px;
-    height: 50px;
+  .partner-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
   }
   
   .partner-name {
-    font-size: 1rem;
+    font-size: 1.1rem;
   }
   
   .partner-username {
@@ -524,7 +519,25 @@
   }
   
   .partner-favorite-game {
-    padding: 8px 10px;
+    padding: 6px 12px;
+  }
+  
+  .game-name {
+    font-size: 0.85rem;
+  }
+  
+  .partner-card-footer {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .footer-left, .footer-right {
+    width: 100%;
+  }
+  
+  .btn-sm {
+    width: 100%;
+    text-align: center;
   }
   
   .filter-btn {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { postsAPI } from '../services/api';
+import { getAvatarUrl, handleImageError } from '../utils/avatar';
 
 interface CreatePostProps {
   onClose: () => void;
@@ -8,22 +9,42 @@ interface CreatePostProps {
 
 const CreatePost: React.FC<CreatePostProps> = ({ onClose, onPostCreated }) => {
   const [content, setContent] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>('');
+  const [privacy, setPrivacy] = useState('public');
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Получаем текущего пользователя из localStorage
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setImageFile(file);
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
       
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      // Ограничиваем до 10 файлов
+      const newFiles = [...imageFiles, ...files].slice(0, 10);
+      setImageFiles(newFiles);
+      
+      // Создаем превью для новых файлов
+      const newPreviews = newFiles.map(file => URL.createObjectURL(file));
+      
+      // Очищаем старые превью
+      imagePreviews.forEach(url => URL.revokeObjectURL(url));
+      
+      setImagePreviews(newPreviews);
     }
+  };
+
+  const removeImage = (index: number) => {
+    const newFiles = imageFiles.filter((_, i) => i !== index);
+    const newPreviews = imagePreviews.filter((_, i) => i !== index);
+    
+    // Очищаем URL удаленного изображения
+    URL.revokeObjectURL(imagePreviews[index]);
+    
+    setImageFiles(newFiles);
+    setImagePreviews(newPreviews);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,151 +59,131 @@ const CreatePost: React.FC<CreatePostProps> = ({ onClose, onPostCreated }) => {
     setError('');
     
     try {
-      // Временно отключаем создание поста в базе данных
-      console.log('Создание поста (тестовый режим):', { content, imageFile });
+      const formData = new FormData();
+      formData.append('content', content);
+      formData.append('privacy', privacy);
       
-      // Имитируем успешное создание
-      setTimeout(() => {
-        onPostCreated();
-        onClose();
-      }, 1000);
+      // Добавляем изображения, если они есть
+      imageFiles.forEach(file => {
+        formData.append('images', file);
+      });
       
-      // Старый код закомментирован:
-      // const formData = new FormData();
-      // formData.append('content', content);
+      console.log('Отправка поста:', { content, privacy, imagesCount: imageFiles.length });
       
-      // if (imageFile) {
-      //   formData.append('image', imageFile);
-      // }
+      const response = await postsAPI.createPost(formData);
+      console.log('Пост создан:', response.data);
       
-      // await postsAPI.createPost(formData);
-      // onPostCreated();
-      // onClose();
+      onPostCreated();
+      onClose();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Ошибка при создании поста');
+      console.error('Ошибка при создании поста:', err);
+      setError(err.response?.data?.detail || err.message || 'Ошибка при создании поста');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{
-      background: 'rgba(0,0,0,0.5)',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        background: 'white',
-        padding: '30px',
-        borderRadius: '10px',
-        width: '500px',
-        maxWidth: '90%',
-        maxHeight: '90%',
-        overflow: 'auto'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0 }}>Создать пост</h2>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content create-post-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">Создать пост</h2>
           <button 
+            className="modal-close"
             onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '24px',
-              cursor: 'pointer',
-              color: '#666'
-            }}
           >
             ×
           </button>
         </div>
         
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label htmlFor="content" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Текст поста</label>
-            <textarea
-              id="content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                border: '1px solid #ddd',
-                borderRadius: '5px',
-                minHeight: '100px',
-                resize: 'vertical'
-              }}
-              placeholder="Что у вас нового?"
+        <form onSubmit={handleSubmit} className="create-post-form">
+          <div className="create-post-modal-author">
+            <img 
+              src={getAvatarUrl(currentUser?.avatar)} 
+              alt={currentUser?.username}
+              className="create-post-modal-avatar"
+              onError={handleImageError}
             />
+            <div>
+              <h3>{currentUser?.username || 'Пользователь'}</h3>
+              <select 
+                className="post-privacy-select"
+                value={privacy}
+                onChange={(e) => setPrivacy(e.target.value)}
+              >
+                <option value="public">🌐 Публичный</option>
+                <option value="friends">👥 Друзья</option>
+                <option value="private">🔒 Только я</option>
+              </select>
+            </div>
           </div>
           
-          <div style={{ marginBottom: '20px' }}>
-            <label htmlFor="image" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>Изображение</label>
-            <input
-              id="image"
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              style={{ width: '100%', padding: '5px' }}
-            />
-            {imagePreview && (
-              <div style={{ marginTop: '10px' }}>
-                <img 
-                  src={imagePreview} 
-                  alt="Preview" 
-                  style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '5px' }}
-                />
+          <textarea
+            className="create-post-textarea"
+            placeholder="Что у вас нового?"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={6}
+          />
+          
+          {/* Превью фотографий */}
+          {imagePreviews.length > 0 && (
+            <div className="post-photos-preview">
+              <h4>Фотографии ({imageFiles.length}/10)</h4>
+              <div className="photos-preview-grid">
+                {imagePreviews.map((url, index) => (
+                  <div key={index} className="photo-preview-item">
+                    <img src={url} alt={`Preview ${index + 1}`} />
+                    <button 
+                      type="button"
+                      className="remove-photo-btn"
+                      onClick={() => removeImage(index)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
           
           {error && (
-            <div style={{ 
-              background: '#f8d7da', 
-              color: '#721c24', 
-              padding: '10px', 
-              borderRadius: '5px',
-              marginBottom: '20px'
-            }}>
+            <div className="error-message">
               {error}
             </div>
           )}
           
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-            <button 
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: '10px 20px',
-                background: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
-              }}
-            >
-              Отмена
-            </button>
-            <button 
-              type="submit"
-              disabled={loading || !content.trim()}
-              style={{
-                padding: '10px 20px',
-                background: loading || !content.trim() ? '#ccc' : '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: loading || !content.trim() ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {loading ? 'Публикация...' : 'Опубликовать'}
-            </button>
+          <div className="create-post-modal-actions">
+            <div className="modal-action-buttons">
+              <label className="modal-action-btn">
+                <input 
+                  type="file" 
+                  multiple 
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  style={{ display: 'none' }}
+                />
+                <span className="modal-action-icon">📷</span>
+                Фото
+              </label>
+            </div>
+            
+            <div className="modal-submit-actions">
+              <button 
+                type="button"
+                className="btn btn-secondary"
+                onClick={onClose}
+              >
+                Отмена
+              </button>
+              <button 
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading || !content.trim()}
+              >
+                {loading ? 'Публикация...' : 'Опубликовать'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

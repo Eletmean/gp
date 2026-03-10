@@ -130,12 +130,6 @@
   gap: 25px;
 }
 
-@media (max-width: 768px) {
-  .basic-info-section {
-    grid-template-columns: 1fr;
-  }
-}
-
 .form-group {
   display: flex;
   flex-direction: column;
@@ -210,6 +204,30 @@
   color: var(--error);
 }
 
+/* Favorite Game section */
+.favorite-game-section {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.form-select {
+  padding: 12px 15px;
+  background: var(--primary-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+}
+
 /* Games section */
 .games-section {
   display: flex;
@@ -217,83 +235,6 @@
   gap: 20px;
   padding-top: 20px;
   border-top: 1px solid var(--border-color);
-}
-
-.games-section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.add-custom-game-btn {
-  padding: 8px 16px;
-  background: var(--primary-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.add-custom-game-btn:hover {
-  background: var(--secondary-bg);
-  border-color: var(--accent-purple);
-}
-
-/* Форма добавления кастомной игры */
-.add-custom-game-form {
-  background: var(--primary-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 20px;
-}
-
-.custom-game-inputs {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.custom-game-inputs .form-input {
-  flex: 1;
-  min-width: 200px;
-}
-
-.logo-selector {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.logo-preview {
-  font-size: 1.5rem;
-  width: 40px;
-  text-align: center;
-}
-
-.logo-select {
-  padding: 10px;
-  background: var(--primary-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.add-game-btn {
-  padding: 10px 20px;
-  background: var(--accent-purple);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.add-game-btn:hover {
-  background: var(--accent-purple-light);
 }
 
 /* Мои игры */
@@ -331,6 +272,7 @@
 .game-card:hover {
   border-color: var(--accent-purple);
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .game-card-content {
@@ -340,96 +282,87 @@
   flex: 1;
 }
 
-.game-logo {
-  font-size: 1.5rem;
-  width: 30px;
-  text-align: center;
-}
-
 .game-name {
   font-size: 0.95rem;
   color: var(--text-primary);
+  font-weight: 500;
+}
+
+.game-hours {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: var(--card-bg);
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
 }
 
 .remove-game-btn {
-  background: none;
+  background: var(--error);
+  color: white;
   border: none;
-  color: var(--error);
-  font-size: 1.2rem;
-  cursor: pointer;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .remove-game-btn:hover {
-  background: rgba(255, 87, 87, 0.1);
+  background: #ff6b6b;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
 }
 
-/* Доступные игры */
-.available-games-section {
-  padding-top: 20px;
-  border-top: 1px solid var(--border-color);
+/* Add game section */
+.add-game-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--primary-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
 }
 
-.available-games-title {
-  font-size: 1.1rem;
+.add-game-title {
+  font-size: 1rem;
   color: var(--text-primary);
   margin-bottom: 15px;
   font-weight: 500;
 }
 
-.available-games-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.available-game-card {
+.add-game-controls {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--primary-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 10px 12px;
-  transition: all 0.3s ease;
-}
-
-.available-game-card:hover {
-  border-color: var(--accent-purple);
-  background: var(--secondary-bg);
-}
-
-.available-game-content {
-  display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
+}
+
+.add-game-select {
   flex: 1;
+  min-width: 0;
 }
 
-.add-game-from-list-btn {
+.add-game-submit-btn {
   background: var(--accent-purple);
   color: white;
   border: none;
-  border-radius: 6px;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 0.95rem;
+  font-weight: 500;
   cursor: pointer;
-  font-size: 1.2rem;
   transition: all 0.3s ease;
+  white-space: nowrap;
 }
 
-.add-game-from-list-btn:hover {
+.add-game-submit-btn:hover:not(:disabled) {
   background: var(--accent-purple-light);
-  transform: scale(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(108, 99, 255, 0.3);
+}
+
+.add-game-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Form actions */
@@ -462,6 +395,7 @@
 .cancel-btn:hover:not(:disabled) {
   background: var(--secondary-bg);
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .save-btn {
@@ -479,6 +413,148 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none !important;
+}
+
+/* Delete account section */
+.delete-account-section {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.delete-title {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  margin-bottom: 15px;
+  font-weight: 500;
+}
+
+.delete-account-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.delete-warning {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.delete-account-btn {
+  background: var(--error);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.delete-account-btn:hover:not(:disabled) {
+  background: #ff6b6b;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+}
+
+.delete-account-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Модалка подтверждения удаления */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--card-bg);
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  background: var(--card-bg);
+  z-index: 1;
+}
+
+.modal-title {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.modal-close:hover {
+  background: var(--primary-bg);
+  color: var(--text-primary);
+}
+
+.delete-confirm-modal {
+  max-width: 400px;
+}
+
+.delete-confirm-content {
+  padding: 30px;
+  text-align: center;
+}
+
+.delete-confirm-warning {
+  color: var(--error);
+  font-size: 1.1rem;
+  margin-bottom: 30px;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.delete-confirm-actions .btn {
+  min-width: 120px;
+  padding: 10px 20px;
 }
 
 /* Responsive */
@@ -499,18 +575,13 @@
     font-size: 1.2rem;
   }
   
-  .games-grid,
-  .available-games-grid {
+  .basic-info-section {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .games-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  }
-  
-  .custom-game-inputs {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .custom-game-inputs .form-input {
-    min-width: auto;
   }
   
   .form-actions {
@@ -520,6 +591,29 @@
   .cancel-btn, .save-btn {
     width: 100%;
     min-width: auto;
+  }
+  
+  .add-game-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .add-game-submit-btn {
+    width: 100%;
+  }
+  
+  .delete-account-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .delete-account-btn {
+    width: 100%;
+  }
+  
+  .modal-content {
+    margin: 10px;
   }
 }
 
@@ -547,14 +641,32 @@
     gap: 25px;
   }
   
-  .games-section-header {
+  .games-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .game-card {
+    padding: 10px 12px;
+  }
+  
+  .delete-confirm-actions {
     flex-direction: column;
-    align-items: flex-start;
     gap: 10px;
   }
   
-  .games-grid,
-  .available-games-grid {
-    grid-template-columns: 1fr;
+  .delete-confirm-actions .btn {
+    width: 100%;
+  }
+  
+  .modal-header {
+    padding: 15px 20px;
+  }
+  
+  .modal-title {
+    font-size: 1.3rem;
+  }
+  
+  .delete-confirm-content {
+    padding: 20px;
   }
 }

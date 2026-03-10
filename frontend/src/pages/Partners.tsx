@@ -5,7 +5,6 @@ import PartnerCard from '../components/partners/PartnerCard';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
 import { useAuth } from '../contexts/AuthContext';
-// import { getAvatarUrl } from '../utils/avatar'; // если понадобится
 import '../styles/Partners.css';
 
 interface Partner {
@@ -21,7 +20,7 @@ interface Partner {
 }
 
 const Partners: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [partners, setPartners] = useState<Partner[]>([]);
   const [filteredPartners, setFilteredPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,8 +79,7 @@ const Partners: React.FC = () => {
   };
 
   const handleSendFriendRequest = async (partnerId: string) => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
+    if (!isAuthenticated) {
       alert('Чтобы добавить в друзья, нужно войти в систему');
       return;
     }
@@ -98,8 +96,7 @@ const Partners: React.FC = () => {
   };
 
   const handleRemoveFriend = async (partnerId: string) => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
+    if (!isAuthenticated) {
       alert('Чтобы удалить из друзей, нужно войти в систему');
       return;
     }
@@ -128,7 +125,6 @@ const Partners: React.FC = () => {
             </p>
           </div>
 
-          {/* Поиск и фильтры */}
           <div className="partners-controls">
             <div className="search-container">
               <input
@@ -169,7 +165,7 @@ const Partners: React.FC = () => {
             </div>
           ) : filteredPartners.length === 0 ? (
             <div className="no-partners">
-              <div className="no-partners-icon"></div>
+              <div className="no-partners-icon">👥</div>
               <h3>Партнеры не найдены</h3>
               {partners.length === 0 ? (
                 <p>В базе данных пока нет партнеров</p>
@@ -194,6 +190,7 @@ const Partners: React.FC = () => {
                   partner={partner}
                   onSendRequest={handleSendFriendRequest}
                   onRemoveFriend={handleRemoveFriend}
+                  isAuthenticated={isAuthenticated}
                 />
               ))}
             </div>

@@ -5,7 +5,7 @@ import Footer from '../components/common/Footer';
 import { partnersAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getAvatarUrl, handleImageError } from '../utils/avatar';
-//import '../styles/PartnerProfile.css';
+import '../styles/PartnerProfile.css';
 
 interface Partner {
   id: string;

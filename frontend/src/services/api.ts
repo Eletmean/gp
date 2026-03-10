@@ -41,25 +41,52 @@ export interface UserGame {
   created_at: string;
 }
 
+// Post types
+export interface PostImage {
+  id: number;
+  image_url: string;
+  created_at: string;
+}
+
+export interface PostAuthor {
+  id: string | number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  avatar?: string;
+}
+
 export interface Post {
   id: number;
+  author_id: string | number;
+  author: PostAuthor;
   content: string;
-  image?: string;
-  author: User;
+  privacy: 'public' | 'friends' | 'private';
+  images: PostImage[];
+  comments: Comment[];
+  likes: any[];
+  comments_count: number;
+  likes_count: number;
+  is_liked: boolean;
   created_at: string;
-  updated_at: string;
-  likes_count?: number;
-  comments_count?: number;
-  is_liked?: boolean;
-  comments?: Comment[];
+  updated_at?: string;
 }
 
 export interface Comment {
   id: number;
+  post_id: number;
+  author_id: string | number;
+  author: PostAuthor;
   content: string;
-  author?: User;
-  user?: User;
   created_at: string;
+  updated_at?: string;
+}
+
+export interface PostListResponse {
+  posts: Post[];
+  total: number;
+  page: number;
+  pages: number;
 }
 
 export interface Friend {
@@ -129,12 +156,28 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Список публичных путей, которые не должны редиректить
+    const publicPaths = [
+      '/games/',
+      '/partners/',
+      '/users/login',
+      '/users/register',
+      '/posts/'
+    ];
+    
+    // Проверяем, является ли запрос публичным
+    const isPublicPath = publicPaths.some(path => 
+      originalRequest.url?.includes(path)
+    );
+    
+    // Если это 401 и запрос НЕ публичный - редиректим
+    if (error.response?.status === 401 && !originalRequest._retry && !isPublicPath) {
       originalRequest._retry = true;
       clearAuthTokens();
       window.location.href = '/login';
     }
     
+    // Для публичных путей просто возвращаем ошибку
     return Promise.reject(error);
   }
 );
@@ -168,6 +211,10 @@ export const authAPI = {
 export const usersAPI = {
   getUser: (userId: string | number) =>
     api.get<User>(`users/${userId}`),
+  
+  // Добавить метод удаления профиля
+  deleteProfile: () => 
+    api.delete('users/me'),
 };
 
 // ===== PARTNERS API =====
@@ -184,13 +231,24 @@ export const partnersAPI = {
   sendFriendRequest: (userId: string) => 
     api.post(`partners/${userId}/friend-request`),
   
+  // Получить входящие запросы в друзья
+  getFriendRequests: () => 
+    api.get<FriendRequest[]>('partners/friend-requests'),
+  
+  // Принять запрос в друзья
+  acceptFriendRequest: (requestId: number) => 
+    api.post(`partners/friend-requests/${requestId}/accept`),
+  
+  // Отклонить запрос в друзья
+  rejectFriendRequest: (requestId: number) => 
+    api.post(`partners/friend-requests/${requestId}/reject`),
+  
   respondToRequest: (userId: string, status: 'accepted' | 'rejected') => 
     api.put(`partners/${userId}/friend-request`, null, { params: { status } }),
   
   removeFriend: (userId: string) => 
     api.delete(`partners/${userId}/friend`),
   
-  // НОВЫЙ МЕТОД - получить друзей пользователя
   getUserFriends: (userId: string) => 
     api.get<Friend[]>(`partners/${userId}/friends`),
 };
@@ -226,14 +284,49 @@ export const gamesAPI = {
 
 // ===== POSTS API =====
 export const postsAPI = {
-  getPosts: () => Promise.resolve({ data: { results: [], count: 0 } }),
-  createPost: () => Promise.reject('Not implemented'),
-  getPost: () => Promise.reject('Not implemented'),
-  updatePost: () => Promise.reject('Not implemented'),
-  deletePost: () => Promise.reject('Not implemented'),
-  getUserPosts: () => Promise.reject('Not implemented'),
-  likePost: () => Promise.reject('Not implemented'),
-  createComment: () => Promise.reject('Not implemented'),
+  // Получить ленту постов
+  getPosts: (page = 1, perPage = 10) => 
+    api.get<PostListResponse>('/posts/', { params: { page, per_page: perPage } }),
+  
+  // Получить посты пользователя
+  getUserPosts: (userId: string | number, page = 1, perPage = 10) => 
+    api.get<PostListResponse>(`/posts/user/${userId}`, { params: { page, per_page: perPage } }),
+  
+  // Получить конкретный пост
+  getPost: (postId: number) => 
+    api.get<Post>(`/posts/${postId}`),
+  
+  // Создать пост
+  createPost: (formData: FormData) => 
+    api.post<Post>('/posts/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }),
+  
+  // Обновить пост
+  updatePost: (postId: number, data: { content?: string; privacy?: string }) => 
+    api.put<Post>(`/posts/${postId}`, data),
+  
+  // Удалить пост
+  deletePost: (postId: number) => 
+    api.delete(`/posts/${postId}`),
+  
+  // Лайкнуть пост
+  likePost: (postId: number) => 
+    api.post(`/posts/${postId}/like`),
+  
+  // Убрать лайк
+  unlikePost: (postId: number) => 
+    api.delete(`/posts/${postId}/like`),
+  
+  // Добавить комментарий
+  addComment: (postId: number, content: string) => 
+    api.post<Comment>(`/posts/${postId}/comments`, { content }),
+  
+  // Удалить комментарий
+  deleteComment: (commentId: number) => 
+    api.delete(`/comments/${commentId}`),
 };
 
 // ===== FRIENDS API =====

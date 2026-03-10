@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authAPI, partnersAPI, gamesAPI } from '../services/api';
-import type { UserProfile } from '../services/api';
+import { authAPI, partnersAPI, gamesAPI, postsAPI } from '../services/api';
+import type { UserProfile, Post as APIPost, FriendRequest } from '../services/api';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
 import { useAuth } from '../contexts/AuthContext';
-import { getAvatarUrl, handleImageError } from '../utils/avatar';
+import { getAvatarUrl, handleImageError as handleAvatarError } from '../utils/avatar';
+import { getImageUrl, handleImageError } from '../utils/image';
+import CreatePost from '../components/CreatePost';
 import '../styles/Profile.css';
 
 interface Game {
@@ -31,13 +33,15 @@ interface Friend {
 interface Post {
   id: number;
   author: string;
+  authorId: string | number;
+  authorAvatar?: string;
   content: string;
   likes: number;
   comments: number;
-  shares: number;
   time: string;
-  game?: string;
+  privacy: string;
   photos: string[];
+  isLiked?: boolean;
 }
 
 const Profile: React.FC = () => {
@@ -48,15 +52,98 @@ const Profile: React.FC = () => {
   const [userGames, setUserGames] = useState<UserGame[]>([]);
   const [userFriends, setUserFriends] = useState<Friend[]>([]);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [showNotifications, setShowNotifications] = useState<boolean>(false);
+  
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
   const [showMenu, setShowMenu] = useState<boolean>(false);
   const [showGamesModal, setShowGamesModal] = useState<boolean>(false);
   const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
   const [showCreatePostModal, setShowCreatePostModal] = useState<boolean>(false);
-  const [postContent, setPostContent] = useState<string>('');
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [postsLoading, setPostsLoading] = useState<boolean>(false);
+
+  const loadUserGames = useCallback(async () => {
+    try {
+      const response = await gamesAPI.getUserGames();
+      setUserGames(response.data);
+    } catch (error) {
+      console.error('Ошибка загрузки игр пользователя:', error);
+    }
+  }, []);
+
+  const loadUserFriends = useCallback(async () => {
+    try {
+      if (user) {
+        const userId = typeof user.id === 'string' ? user.id : String(user.id);
+        const response = await partnersAPI.getUserFriends(userId);
+        setUserFriends(response.data);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки друзей:', error);
+    }
+  }, [user]);
+
+  const loadFriendRequests = useCallback(async () => {
+    try {
+      const response = await partnersAPI.getFriendRequests();
+      setFriendRequests(response.data);
+    } catch (error) {
+      console.error('Ошибка загрузки запросов в друзья:', error);
+    }
+  }, []);
+
+  const handleAcceptRequest = async (requestId: number) => {
+    try {
+      await partnersAPI.acceptFriendRequest(requestId);
+      await loadFriendRequests();
+      if (user) {
+        await loadUserFriends();
+      }
+    } catch (error) {
+      console.error('Ошибка при принятии запроса:', error);
+      alert('Не удалось принять запрос');
+    }
+  };
+
+  const handleRejectRequest = async (requestId: number) => {
+    try {
+      await partnersAPI.rejectFriendRequest(requestId);
+      await loadFriendRequests();
+    } catch (error) {
+      console.error('Ошибка при отклонении запроса:', error);
+      alert('Не удалось отклонить запрос');
+    }
+  };
+
+  const loadUserPosts = useCallback(async (userId: string | number) => {
+    try {
+      setPostsLoading(true);
+      const id = typeof userId === 'string' ? userId : String(userId);
+      const response = await postsAPI.getUserPosts(id);
+      console.log('Загруженные посты:', response.data);
+      
+      const formattedPosts: Post[] = response.data.posts.map((post: APIPost) => ({
+        id: post.id,
+        author: post.author.username,
+        authorId: post.author.id,
+        authorAvatar: post.author.avatar,
+        content: post.content,
+        likes: post.likes_count || 0,
+        comments: post.comments_count || 0,
+        time: new Date(post.created_at).toLocaleString(),
+        privacy: post.privacy,
+        photos: post.images.map(img => img.image_url),
+        isLiked: post.is_liked
+      }));
+      
+      setUserPosts(formattedPosts);
+    } catch (error) {
+      console.error('Ошибка загрузки постов:', error);
+    } finally {
+      setPostsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -70,8 +157,8 @@ const Profile: React.FC = () => {
         localStorage.setItem('user', JSON.stringify(response.data));
         setError('');
         
-        // Загружаем игры пользователя
         await loadUserGames();
+        await loadFriendRequests();
         
       } catch (error: any) {
         console.error('Ошибка загрузки профиля:', error);
@@ -88,35 +175,14 @@ const Profile: React.FC = () => {
     };
     
     fetchProfile();
-  }, [navigate]);
+  }, [navigate, loadUserGames, loadFriendRequests]);
 
-  // Загрузка друзей после получения user
   useEffect(() => {
     if (user) {
       loadUserFriends();
+      loadUserPosts(user.id);
     }
-  }, [user]);
-
-  const loadUserGames = async () => {
-    try {
-      const response = await gamesAPI.getUserGames();
-      setUserGames(response.data);
-    } catch (error) {
-      console.error('Ошибка загрузки игр пользователя:', error);
-    }
-  };
-
-  const loadUserFriends = async () => {
-    try {
-      if (user) {
-        const userId = typeof user.id === 'string' ? user.id : String(user.id);
-        const response = await partnersAPI.getUserFriends(userId);
-        setUserFriends(response.data);
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки друзей:', error);
-    }
-  };
+  }, [user, loadUserFriends, loadUserPosts]);
 
   const handleLogout = () => {
     logout();
@@ -132,60 +198,78 @@ const Profile: React.FC = () => {
     navigate('/posts');
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      const newFiles = [...selectedFiles, ...files].slice(0, 10);
-      setSelectedFiles(newFiles);
-      
-      const newPreviewUrls = newFiles.map(file => URL.createObjectURL(file));
-      setPreviewUrls(newPreviewUrls);
+  const handlePostCreated = () => {
+    if (user) {
+      loadUserPosts(user.id);
     }
   };
 
-  const removeFile = (index: number) => {
-    const newFiles = selectedFiles.filter((_, i) => i !== index);
-    const newPreviewUrls = previewUrls.filter((_, i) => i !== index);
-    
-    URL.revokeObjectURL(previewUrls[index]);
-    
-    setSelectedFiles(newFiles);
-    setPreviewUrls(newPreviewUrls);
+  const handleLikePost = async (postId: number) => {
+    try {
+      await postsAPI.likePost(postId);
+      setUserPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, likes: post.likes + 1, isLiked: true }
+          : post
+      ));
+    } catch (error) {
+      console.error('Error liking post:', error);
+    }
   };
 
-  const handleCreatePost = () => {
-    if (!postContent.trim() && selectedFiles.length === 0) {
-      alert('Добавьте текст или фотографии для создания поста');
+  const handleUnlikePost = async (postId: number) => {
+    try {
+      await postsAPI.unlikePost(postId);
+      setUserPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? { ...post, likes: post.likes - 1, isLiked: false }
+          : post
+      ));
+    } catch (error) {
+      console.error('Error unliking post:', error);
+    }
+  };
+
+  const handleDeletePost = async (postId: number) => {
+    if (!window.confirm('Вы уверены, что хотите удалить этот пост?')) {
       return;
     }
     
-    console.log('Создание поста:', { content: postContent, files: selectedFiles });
-    
-    const newPost: Post = {
-      id: Date.now(),
-      author: user?.username || 'User',
-      content: postContent || 'Новый пост',
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      time: 'Только что',
-      photos: [...previewUrls]
-    };
-    
-    setUserPosts(prev => [newPost, ...prev]);
-    
-    setPostContent('');
-    setSelectedFiles([]);
-    
-    previewUrls.forEach(url => URL.revokeObjectURL(url));
-    setPreviewUrls([]);
-    setShowCreatePostModal(false);
+    try {
+      await postsAPI.deletePost(postId);
+      setUserPosts(prev => prev.filter(post => post.id !== postId));
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      alert('Ошибка при удалении поста');
+    }
   };
 
   // Отображаемые данные
   const displayedGames = userGames.slice(0, 3);
   const displayedFriends = userFriends.slice(0, 3);
-  const displayedPosts = userPosts.length > 0 ? userPosts : [];
+  const displayedPosts = userPosts;
+
+  // Полное имя пользователя
+  const getFullName = () => {
+    if (user?.first_name && user?.last_name) {
+      return `${user.first_name} ${user.last_name}`;
+    } else if (user?.first_name) {
+      return user.first_name;
+    } else if (user?.last_name) {
+      return user.last_name;
+    } else {
+      return user?.username || 'Пользователь';
+    }
+  };
+
+  const getPrivacyLabel = (privacy: string) => {
+    switch (privacy) {
+      case 'public': return 'Публичный';
+      case 'friends': return 'Друзья';
+      case 'private': return 'Только я';
+      default: return 'Публичный';
+    }
+  };
 
   return (
     <div className="page-wrapper">
@@ -222,43 +306,96 @@ const Profile: React.FC = () => {
                         src={getAvatarUrl(user?.avatar)} 
                         alt="Avatar" 
                         className="profile-avatar-img"
-                        onError={handleImageError}
+                        onError={handleAvatarError}
                       />
                     </div>
                     
                     <div className="profile-text-info">
-                      <h1 className="profile-username-large">{user.username}</h1>
+                      <h1 className="profile-username-large">{getFullName()}</h1>
                       <p className="profile-bio">{user.bio || 'Пользователь не добавил информацию о себе'}</p>
+                      
+                      {user.favorite_game && (
+                        <div className="profile-favorite-game">
+                          <span className="favorite-game-label">Любимая игра:</span>
+                          <span className="favorite-game-name">{user.favorite_game}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   
-                  {/* Кнопка меню */}
+                  {/* Кнопка меню и уведомления */}
                   <div className="profile-menu-container">
+                    {/* Кнопка уведомлений */}
+                    <div className="notifications-container">
+                      <button 
+                        className={`notifications-btn ${friendRequests.length > 0 ? 'has-notifications' : ''}`}
+                        onClick={() => setShowNotifications(!showNotifications)}
+                      >
+                        Уведомления
+                        {friendRequests.length > 0 && (
+                          <span className="notifications-badge">{friendRequests.length}</span>
+                        )}
+                      </button>
+                      
+                      {/* Выпадающее меню уведомлений */}
+                      {showNotifications && (
+                        <div className="notifications-dropdown">
+                          <div className="notifications-header">
+                            <h3>Уведомления</h3>
+                            <button onClick={() => setShowNotifications(false)}>✕</button>
+                          </div>
+                          <div className="notifications-list">
+                            {friendRequests.length === 0 ? (
+                              <div className="no-notifications">Нет новых уведомлений</div>
+                            ) : (
+                              friendRequests.map(request => (
+                                <div key={request.id} className="notification-item">
+                                  <img 
+                                    src={getAvatarUrl(request.from_user?.avatar)} 
+                                    alt={request.from_user?.username}
+                                    className="notification-avatar"
+                                    onError={handleAvatarError}
+                                  />
+                                  <div className="notification-content">
+                                    <p>
+                                      <strong>{request.from_user?.first_name} {request.from_user?.last_name}</strong>
+                                      <br />
+                                      <span className="notification-text">хочет добавить вас в друзья</span>
+                                    </p>
+                                    <div className="notification-actions">
+                                      <button 
+                                        className="btn btn-primary btn-sm"
+                                        onClick={() => handleAcceptRequest(request.id)}
+                                      >
+                                        Принять
+                                      </button>
+                                      <button 
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => handleRejectRequest(request.id)}
+                                      >
+                                        Отклонить
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     <button 
                       className="profile-menu-btn"
                       onClick={() => setShowMenu(!showMenu)}
                     >
-                      <span className="menu-dots">⋯</span>
+                      Меню
                     </button>
                     
                     {showMenu && (
                       <div className="profile-dropdown-menu">
                         <button className="dropdown-item" onClick={handleEditProfile}>
-                          <span className="dropdown-icon">✏️</span>
                           Редактировать профиль
-                        </button>
-                        <button className="dropdown-item" onClick={handleShowPosts}>
-                          <span className="dropdown-icon">📝</span>
-                          Мои посты
-                        </button>
-                        <button className="dropdown-item" onClick={() => setShowFriendsModal(true)}>
-                          <span className="dropdown-icon">👥</span>
-                          Все друзья
-                        </button>
-                        <div className="dropdown-divider"></div>
-                        <button className="dropdown-item logout-item" onClick={handleLogout}>
-                          <span className="dropdown-icon">🚪</span>
-                          Выйти
                         </button>
                       </div>
                     )}
@@ -277,7 +414,7 @@ const Profile: React.FC = () => {
                         <img 
                           src={getAvatarUrl(user?.avatar)} 
                           alt={user.username}
-                          onError={handleImageError}
+                          onError={handleAvatarError}
                         />
                       </div>
                       <button 
@@ -290,7 +427,9 @@ const Profile: React.FC = () => {
                   </div>
                   
                   {/* Список постов */}
-                  {displayedPosts.length === 0 ? (
+                  {postsLoading ? (
+                    <div className="loading">Загрузка постов...</div>
+                  ) : displayedPosts.length === 0 ? (
                     <div className="empty-posts">
                       <p>У вас пока нет постов. Создайте первый пост!</p>
                     </div>
@@ -301,17 +440,28 @@ const Profile: React.FC = () => {
                           <div className="post-author">
                             <div className="post-avatar">
                               <img 
-                                src={getAvatarUrl(user?.avatar)} 
+                                src={getAvatarUrl(post.authorAvatar)} 
                                 alt={post.author}
-                                onError={handleImageError}
+                                onError={handleAvatarError}
                               />
                             </div>
                             <div className="post-author-info">
                               <span className="post-author-name">{post.author}</span>
                               <span className="post-time">{post.time}</span>
+                              <span className="post-privacy-badge">{getPrivacyLabel(post.privacy)}</span>
                             </div>
                           </div>
-                          {post.game && <span className="post-game-tag">{post.game}</span>}
+                          
+                          {/* Кнопка удаления для своих постов */}
+                          {post.authorId === user.id && (
+                            <button 
+                              className="post-delete-btn"
+                              onClick={() => handleDeletePost(post.id)}
+                              title="Удалить пост"
+                            >
+                              Удалить
+                            </button>
+                          )}
                         </div>
                         
                         <div className="post-content">
@@ -323,13 +473,21 @@ const Profile: React.FC = () => {
                           <div className="post-photos">
                             {post.photos.length === 1 ? (
                               <div className="single-photo">
-                                <img src={post.photos[0]} alt="Post" />
+                                <img 
+                                  src={getImageUrl(post.photos[0])} 
+                                  alt="Post" 
+                                  onError={handleImageError}
+                                />
                               </div>
                             ) : (
                               <div className="multiple-photos">
                                 {post.photos.slice(0, 4).map((photo, index) => (
                                   <div key={index} className="photo-item">
-                                    <img src={photo} alt={`Post ${index + 1}`} />
+                                    <img 
+                                      src={getImageUrl(photo)} 
+                                      alt={`Post ${index + 1}`}
+                                      onError={handleImageError}
+                                    />
                                     {index === 3 && post.photos.length > 4 && (
                                       <div className="photos-overlay">
                                         +{post.photos.length - 4}
@@ -344,10 +502,15 @@ const Profile: React.FC = () => {
                         
                         <div className="post-stats">
                           <div className="post-stat">
-                            <span className="stat-count">{post.likes} ❤️</span>
+                            <button 
+                              className={`like-btn ${post.isLiked ? 'liked' : ''}`}
+                              onClick={() => post.isLiked ? handleUnlikePost(post.id) : handleLikePost(post.id)}
+                            >
+                              {post.likes} {post.isLiked ? 'Нравится' : 'Нравится'}
+                            </button>
                           </div>
                           <div className="post-stat">
-                            <span className="stat-count">{post.comments} 💬</span>
+                            <span className="comment-icon">{post.comments} Комментарии</span>
                           </div>
                         </div>
                       </div>
@@ -378,6 +541,9 @@ const Profile: React.FC = () => {
                         {displayedGames.map(userGame => (
                           <div key={userGame.id} className="game-item">
                             <span className="game-name">{userGame.game.name}</span>
+                            {userGame.hours_played > 0 && (
+                              <span className="game-hours">{userGame.hours_played}ч</span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -408,7 +574,7 @@ const Profile: React.FC = () => {
                               <img 
                                 src={getAvatarUrl(friend.avatar)} 
                                 alt={friend.username}
-                                onError={handleImageError}
+                                onError={handleAvatarError}
                               />
                             </div>
                             <span className="friend-mini-name">{friend.username}</span>
@@ -422,106 +588,10 @@ const Profile: React.FC = () => {
               
               {/* Модалка создания поста */}
               {showCreatePostModal && (
-                <div className="modal-overlay" onClick={() => setShowCreatePostModal(false)}>
-                  <div className="modal-content create-post-modal" onClick={(e) => e.stopPropagation()}>
-                    <div className="modal-header">
-                      <h2 className="modal-title">Создать пост</h2>
-                      <button 
-                        className="modal-close"
-                        onClick={() => setShowCreatePostModal(false)}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    
-                    <div className="create-post-modal-content">
-                      <div className="create-post-modal-author">
-                        <img 
-                          src={getAvatarUrl(user?.avatar)} 
-                          alt={user?.username}
-                          className="create-post-modal-avatar"
-                          onError={handleImageError}
-                        />
-                        <div>
-                          <h3>{user?.username}</h3>
-                          <select className="post-privacy-select">
-                            <option value="public">Публичный</option>
-                            <option value="friends">Друзья</option>
-                            <option value="onlyme">Только я</option>
-                          </select>
-                        </div>
-                      </div>
-                      
-                      <textarea 
-                        className="create-post-textarea"
-                        placeholder="Что у вас нового?"
-                        value={postContent}
-                        onChange={(e) => setPostContent(e.target.value)}
-                        rows={6}
-                      />
-                      
-                      {/* Превью фотографий */}
-                      {previewUrls.length > 0 && (
-                        <div className="post-photos-preview">
-                          <h4>Фотографии ({selectedFiles.length}/10)</h4>
-                          <div className="photos-preview-grid">
-                            {previewUrls.map((url, index) => (
-                              <div key={index} className="photo-preview-item">
-                                <img src={url} alt={`Preview ${index + 1}`} />
-                                <button 
-                                  className="remove-photo-btn"
-                                  onClick={() => removeFile(index)}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="create-post-modal-actions">
-                        <div className="modal-action-buttons">
-                          <label className="modal-action-btn">
-                            <input 
-                              type="file" 
-                              multiple 
-                              accept="image/*"
-                              onChange={handleFileSelect}
-                              style={{ display: 'none' }}
-                            />
-                            <span className="modal-action-icon">📷</span>
-                            Фото/Видео
-                          </label>
-                          <button className="modal-action-btn">
-                            <span className="modal-action-icon">🏷️</span>
-                            Отметить друзей
-                          </button>
-                          <button className="modal-action-btn">
-                            <span className="modal-action-icon">📍</span>
-                            Отметить место
-                          </button>
-                        </div>
-                        
-                        <div className="modal-submit-actions">
-                          <button 
-                            className="btn btn-secondary"
-                            onClick={() => setShowCreatePostModal(false)}
-                          >
-                            Отмена
-                          </button>
-                          <button 
-                            className="btn btn-primary"
-                            onClick={handleCreatePost}
-                            disabled={!postContent.trim() && selectedFiles.length === 0}
-                          >
-                            Опубликовать
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <CreatePost
+                  onClose={() => setShowCreatePostModal(false)}
+                  onPostCreated={handlePostCreated}
+                />
               )}
               
               {/* Модалка игр */}
@@ -542,6 +612,9 @@ const Profile: React.FC = () => {
                       {userGames.map(userGame => (
                         <div key={userGame.id} className="modal-game-card">
                           <h3 className="modal-game-name">{userGame.game.name}</h3>
+                          {userGame.hours_played > 0 && (
+                            <span className="modal-game-hours">{userGame.hours_played}ч</span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -570,7 +643,7 @@ const Profile: React.FC = () => {
                             src={getAvatarUrl(friend.avatar)} 
                             alt={friend.username}
                             className="modal-friend-avatar"
-                            onError={handleImageError}
+                            onError={handleAvatarError}
                           />
                           <div className="modal-friend-info">
                             <h3 className="modal-friend-name">{friend.username}</h3>
