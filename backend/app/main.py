@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 from sqlalchemy import text
 
-from .routes import games, users, partners
+from .routes import games, users, partners, user_games, posts  # Добавили posts
 from .database import engine, Base
 
 # Ждем готовности базы данных
@@ -43,14 +43,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files for avatars
+# Static files for avatars and posts
 os.makedirs("static/avatars", exist_ok=True)
+os.makedirs("static/posts", exist_ok=True)  # Добавили папку для постов
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Routes
 app.include_router(games.router)
 app.include_router(users.router)
 app.include_router(partners.router)
+app.include_router(user_games.router)
+app.include_router(posts.router)  # Добавили роутер для постов
 
 @app.get("/")
 async def root():

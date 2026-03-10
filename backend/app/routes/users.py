@@ -37,8 +37,6 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
             first_name=user.first_name,
             last_name=user.last_name,
             hashed_password=hashed_password,
-            bio="",
-            avatar="/static/default-avatar.png",
             is_active=True
         )
         
@@ -46,7 +44,11 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
         db.flush()
         
         # Создаем профиль
-        db_profile = models.UserProfile(user_id=db_user.id)
+        db_profile = models.UserProfile(
+            user_id=db_user.id,
+            bio="",
+            avatar="/static/default-avatar.png"
+        )
         db.add(db_profile)
         db.commit()
         db.refresh(db_user)
@@ -89,47 +91,75 @@ def login(user_data: schemas.UserLogin, db: Session = Depends(get_db)):
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.get("/profile", response_model=schemas.User)
-def get_profile(
-    current_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Получение профиля текущего пользователя"""
-    profile = db.query(models.UserProfile).filter(models.UserProfile.user_id == current_user.id).first()
-    current_user.profile = profile
-    return current_user
-
 @router.get("/me", response_model=schemas.User)
 def read_users_me(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Получение информации о текущем пользователе"""
-    profile = db.query(models.UserProfile).filter(models.UserProfile.user_id == current_user.id).first()
-    current_user.profile = profile
+    # Загружаем профиль (нужно для properties)
+    profile = db.query(models.UserProfile).filter(
+        models.UserProfile.user_id == current_user.id
+    ).first()
+    
+    # Если профиля нет, создаем
+    if not profile:
+        profile = models.UserProfile(
+            user_id=current_user.id,
+            bio="",
+            avatar="/static/default-avatar.png"
+        )
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+        db.refresh(current_user)
+    
     return current_user
+
+@router.get("/profile", response_model=schemas.User)
+def get_profile(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Получение профиля текущего пользователя (алиас для /me)"""
+    return read_users_me(current_user, db)
 
 @router.put("/me", response_model=schemas.User)
 def update_user(
     first_name: Optional[str] = Form(None),
     last_name: Optional[str] = Form(None),
-    bio: Optional[str] = Form(None),
     favorite_game: Optional[str] = Form(None),
+    bio: Optional[str] = Form(None),
     avatar: Optional[UploadFile] = File(None),
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Обновление профиля пользователя"""
     
-    # Обновляем текстовые поля
+    # Обновляем поля в users
     if first_name is not None:
         current_user.first_name = first_name
     if last_name is not None:
         current_user.last_name = last_name
-    if bio is not None:
-        current_user.bio = bio
     if favorite_game is not None:
         current_user.favorite_game = favorite_game
+    
+    # Получаем или создаем профиль
+    profile = db.query(models.UserProfile).filter(
+        models.UserProfile.user_id == current_user.id
+    ).first()
+    
+    if not profile:
+        profile = models.UserProfile(
+            user_id=current_user.id,
+            bio="",
+            avatar="/static/default-avatar.png"
+        )
+        db.add(profile)
+    
+    # Обновляем поля в profile
+    if bio is not None:
+        profile.bio = bio
     
     # Обновляем аватар если загружен
     if avatar:
@@ -145,19 +175,46 @@ def update_user(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(avatar.file, buffer)
         
-        # Обновляем путь к аватару в БД
-        current_user.avatar = f"/static/avatars/{file_name}"
+        # Обновляем путь к аватару в профиле
+        profile.avatar = f"/static/avatars/{file_name}"
     
     current_user.updated_at = datetime.utcnow()
+    profile.updated_at = datetime.utcnow()
     
     db.commit()
     db.refresh(current_user)
-    
-    # Загружаем профиль
-    profile = db.query(models.UserProfile).filter(models.UserProfile.user_id == current_user.id).first()
-    current_user.profile = profile
+    db.refresh(profile)
     
     return current_user
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Удалить свой профиль (и все связанные данные)
+    Благодаря cascade="all, delete-orphan" в моделях, все связанные данные удалятся автоматически:
+    - профиль
+    - посты
+    - комментарии
+    - лайки
+    - игры пользователя
+    - дружеские связи
+    """
+    print(f"🔴 Удаление пользователя {current_user.id} ({current_user.email})")
+    
+    # Проверяем, существует ли пользователь
+    user = db.query(models.User).filter(models.User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    # Удаляем пользователя (все связанные данные удалятся каскадно)
+    db.delete(user)
+    db.commit()
+    
+    print(f"✅ Пользователь {current_user.email} успешно удален")
+    return None
 
 @router.post("/logout")
 def logout():
@@ -177,6 +234,8 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     
     profile = db.query(models.UserProfile).filter(models.UserProfile.user_id == user.id).first()
+    
+    # Принудительно загружаем профиль для properties
     user.profile = profile
     
     return user

@@ -36,31 +36,44 @@ class UserLogin(BaseModel):
 class UserUpdate(BaseModel):
     first_name: Optional[str] = Field(None, min_length=1, max_length=30)
     last_name: Optional[str] = Field(None, min_length=1, max_length=30)
-    bio: Optional[str] = Field(None, max_length=1000)
-    avatar: Optional[str] = None
     favorite_game: Optional[str] = Field(None, max_length=100)
 
 class UserProfileSchema(BaseModel):
+    bio: Optional[str] = None
+    avatar: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
+class UserGameSchema(BaseModel):
+    id: int
+    game_id: int
+    game_name: str
+    game_image_url: Optional[str] = None
+    hours_played: float
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
 class User(UserBase):
     id: UUID
-    bio: Optional[str] = None
-    avatar: Optional[str] = None
     favorite_game: Optional[str] = None
     date_joined: datetime
     updated_at: Optional[datetime] = None
+    bio: Optional[str] = None
+    avatar: Optional[str] = None
     profile: Optional[UserProfileSchema] = None
+    games: Optional[List[UserGameSchema]] = []
     model_config = ConfigDict(from_attributes=True)
 
 class UserInDB(User):
     hashed_password: str
 
 # Partner/User profile for listing
-class PartnerUser(UserBase):
+class PartnerUser(BaseModel):
     id: UUID
+    username: str
+    first_name: str
+    last_name: str
     bio: Optional[str] = None
     avatar: Optional[str] = None
     favorite_game: Optional[str] = None
@@ -74,6 +87,7 @@ class PartnerProfile(BaseModel):
     user: PartnerUser
     friends_count: int = 0
     games_count: int = 0
+    games: Optional[List[UserGameSchema]] = []
     is_friend: bool = False
     friendship_status: Optional[str] = None
 
@@ -96,6 +110,8 @@ class FriendResponse(BaseModel):
     status: str  # 'pending', 'accepted', 'rejected'
     created_at: datetime
     updated_at: Optional[datetime] = None
+    user: Optional[PartnerUser] = None
+    friend: Optional[PartnerUser] = None
     model_config = ConfigDict(from_attributes=True)
 
 # User Game schemas
@@ -109,9 +125,102 @@ class UserGameCreate(UserGameBase):
 class UserGameUpdate(BaseModel):
     hours_played: Optional[float] = None
 
-class UserGame(UserGameBase):
+class UserGameResponse(UserGameBase):
     id: int
     user_id: UUID
     created_at: datetime
     game: Optional[Game] = None
     model_config = ConfigDict(from_attributes=True)
+
+# ========== POST SCHEMAS ==========
+
+# PostImage schemas
+class PostImageBase(BaseModel):
+    image_url: str
+
+class PostImageCreate(PostImageBase):
+    pass
+
+class PostImage(PostImageBase):
+    id: int
+    post_id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+# Comment schemas
+class CommentBase(BaseModel):
+    content: str = Field(..., min_length=1, max_length=1000)
+
+class CommentCreate(CommentBase):
+    pass
+
+class CommentUpdate(BaseModel):
+    content: Optional[str] = Field(None, min_length=1, max_length=1000)
+
+class CommentAuthor(BaseModel):
+    id: UUID
+    username: str
+    first_name: str
+    last_name: str
+    avatar: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class Comment(CommentBase):
+    id: int
+    post_id: int
+    author_id: UUID
+    author: CommentAuthor
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# Like schemas
+class LikeBase(BaseModel):
+    pass
+
+class Like(LikeBase):
+    id: int
+    post_id: int
+    user_id: UUID
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+# Post schemas
+class PostBase(BaseModel):
+    content: str = Field(..., min_length=1, max_length=5000)
+    privacy: str = "public"  # public, friends, private
+
+class PostCreate(PostBase):
+    images: Optional[List[str]] = None  # список base64 или urls
+
+class PostUpdate(BaseModel):
+    content: Optional[str] = Field(None, min_length=1, max_length=5000)
+    privacy: Optional[str] = None
+
+class PostAuthor(BaseModel):
+    id: UUID
+    username: str
+    first_name: str
+    last_name: str
+    avatar: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class Post(PostBase):
+    id: int
+    author_id: UUID
+    author: PostAuthor
+    images: List[PostImage] = []
+    comments: List[Comment] = []
+    likes: List[Like] = []
+    comments_count: int = 0
+    likes_count: int = 0
+    is_liked: bool = False
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class PostList(BaseModel):
+    posts: List[Post]
+    total: int
+    page: int
+    pages: int

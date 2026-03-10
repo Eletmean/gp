@@ -61,7 +61,7 @@ def delete_game(game_id: int, db: Session = Depends(get_db)):
     return {"message": "Game deleted successfully"}
 
 # Эндпоинты для игр пользователя
-@router.get("/my-games/", response_model=List[schemas.UserGame])
+@router.get("/my-games/", response_model=List[schemas.UserGameResponse])
 def get_my_games(
     current_user: models.User = Depends(auth.get_current_active_user),
     db: Session = Depends(get_db)
@@ -72,7 +72,7 @@ def get_my_games(
     ).all()
     return user_games
 
-@router.post("/my-games/", response_model=schemas.UserGame)
+@router.post("/my-games/", response_model=schemas.UserGameResponse)
 def add_game_to_user(
     user_game: schemas.UserGameCreate,
     current_user: models.User = Depends(auth.get_current_active_user),
@@ -107,7 +107,7 @@ def add_game_to_user(
     
     return db_user_game
 
-@router.put("/my-games/{user_game_id}", response_model=schemas.UserGame)
+@router.put("/my-games/{user_game_id}", response_model=schemas.UserGameResponse)
 def update_user_game(
     user_game_id: int,
     user_game_update: schemas.UserGameUpdate,

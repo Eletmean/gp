@@ -1,398 +1,388 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+from sqlalchemy import or_
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime
 
-from .. import models, schemas, auth
+from .. import models, schemas
 from ..database import get_db
+from ..auth import get_current_active_user
 
 router = APIRouter(prefix="/api/partners", tags=["partners"])
 
-# ========== ПУБЛИЧНЫЕ ЭНДПОИНТЫ (не требуют авторизации) ==========
-
 @router.get("/", response_model=List[schemas.PartnerUser])
 def get_partners(
-    skip: int = 0, 
+    search: Optional[str] = None,
+    skip: int = 0,
     limit: int = 20,
-    game: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
-    Получение списка всех зарегистрированных пользователей
+    Получить список всех пользователей (партнеров) - ПОЛНОСТЬЮ ПУБЛИЧНЫЙ ЭНДПОИНТ
     """
-    # Берем ВСЕХ пользователей
-    query = db.query(models.User)
+    print(f"🔵 GET /api/partners/ - публичный запрос")
     
-    # Фильтр по любимой игре если указан
-    if game:
-        query = query.filter(models.User.favorite_game.ilike(f"%{game}%"))
+    # Базовый запрос - только активные пользователи
+    query = db.query(models.User).filter(models.User.is_active == True)
     
-    # Сортировка по дате регистрации (новые сначала)
-    query = query.order_by(models.User.date_joined.desc())
-    
-    partners = query.offset(skip).limit(limit).all()
-    
-    result = []
-    for partner in partners:
-        partner_dict = {
-            "id": partner.id,
-            "email": partner.email,
-            "username": partner.username,
-            "first_name": partner.first_name,
-            "last_name": partner.last_name,
-            "bio": partner.bio,
-            "avatar": partner.avatar,
-            "favorite_game": partner.favorite_game,
-            "is_friend": False,
-            "friendship_status": None
-        }
-        result.append(partner_dict)
-    
-    return result
-
-
-@router.get("/search", response_model=List[schemas.PartnerUser])
-def search_partners(
-    query: str,
-    db: Session = Depends(get_db)
-):
-    """
-    Поиск по зарегистрированным пользователям
-    """
-    users = db.query(models.User).filter(
-        or_(
-            models.User.username.ilike(f"%{query}%"),
-            models.User.first_name.ilike(f"%{query}%"),
-            models.User.last_name.ilike(f"%{query}%"),
-            models.User.email.ilike(f"%{query}%")
+    # Поиск по имени, фамилии или username
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                models.User.first_name.ilike(search_term),
+                models.User.last_name.ilike(search_term),
+                models.User.username.ilike(search_term)
+            )
         )
-    ).limit(20).all()
+    
+    # Пагинация
+    users = query.offset(skip).limit(limit).all()
+    print(f"📊 Найдено пользователей: {len(users)}")
     
     result = []
     for user in users:
-        user_dict = {
-            "id": user.id,
-            "email": user.email,
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "bio": user.bio,
-            "avatar": user.avatar,
-            "favorite_game": user.favorite_game,
-            "is_friend": False,
-            "friendship_status": None
-        }
-        result.append(user_dict)
+        # Получаем аватар из профиля если есть
+        avatar_url = "/static/default-avatar.png"
+        if user.profile and user.profile.avatar:
+            avatar_url = user.profile.avatar
+        elif hasattr(user, 'avatar') and user.avatar:
+            avatar_url = user.avatar
+            
+        # Получаем bio из профиля если есть
+        bio = ""
+        if user.profile and user.profile.bio:
+            bio = user.profile.bio
+        elif hasattr(user, 'bio') and user.bio:
+            bio = user.bio
+        
+        # Создаем PartnerUser из модели User
+        partner_data = schemas.PartnerUser(
+            id=str(user.id),
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            bio=bio,
+            avatar=avatar_url,
+            favorite_game=user.favorite_game,
+            is_friend=False,  # Для неавторизованных всегда False
+            friendship_status=None
+        )
+        result.append(partner_data)
     
     return result
-
 
 @router.get("/{user_id}", response_model=schemas.PartnerProfile)
 def get_partner_profile(
-    user_id: str,
+    user_id: UUID,
     db: Session = Depends(get_db)
 ):
     """
-    Получение профиля любого пользователя по ID
+    Получить детальную информацию о партнере - ПУБЛИЧНЫЙ ЭНДПОИНТ
     """
-    try:
-        user_uuid = UUID(user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    user = db.query(models.User).filter(
+        models.User.id == user_id, 
+        models.User.is_active == True
+    ).first()
     
-    user = db.query(models.User).filter(models.User.id == user_uuid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Считаем количество друзей
+    # Получаем аватар из профиля если есть
+    avatar_url = "/static/default-avatar.png"
+    if user.profile and user.profile.avatar:
+        avatar_url = user.profile.avatar
+    elif hasattr(user, 'avatar') and user.avatar:
+        avatar_url = user.avatar
+        
+    # Получаем bio из профиля если есть
+    bio = ""
+    if user.profile and user.profile.bio:
+        bio = user.profile.bio
+    elif hasattr(user, 'bio') and user.bio:
+        bio = user.bio
+    
+    # Создаем объект партнера
+    partner_user = schemas.PartnerUser(
+        id=str(user.id),
+        username=user.username,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        bio=bio,
+        avatar=avatar_url,
+        favorite_game=user.favorite_game,
+        is_friend=False,
+        friendship_status=None
+    )
+    
+    # Получаем количество друзей
     friends_count = db.query(models.Friend).filter(
-        or_(
-            models.Friend.user_id == user.id,
-            models.Friend.friend_id == user.id
-        ),
-        models.Friend.status == "accepted"
+        ((models.Friend.user_id == user.id) | (models.Friend.friend_id == user.id)) &
+        (models.Friend.status == "accepted")
     ).count()
     
-    # Считаем количество игр пользователя
-    games_count = db.query(models.UserGame).filter(models.UserGame.user_id == user.id).count()
+    # Получаем игры пользователя
+    user_games = []
+    for ug in user.user_games:
+        user_games.append(schemas.UserGameResponse(
+            id=ug.id,
+            game_id=ug.game_id,
+            game_name=ug.game.name,
+            game_image_url=ug.game.image_url,
+            hours_played=ug.hours_played,
+            created_at=ug.created_at
+        ))
     
-    user_data = {
-        "id": user.id,
-        "email": user.email,
-        "username": user.username,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "bio": user.bio,
-        "avatar": user.avatar,
-        "favorite_game": user.favorite_game,
-        "is_friend": False,
-        "friendship_status": None
-    }
-    
-    return {
-        "user": user_data,
-        "friends_count": friends_count,
-        "games_count": games_count,
-        "is_friend": False,
-        "friendship_status": None
-    }
+    return schemas.PartnerProfile(
+        user=partner_user,
+        friends_count=friends_count,
+        games_count=len(user.user_games),
+        games=user_games,
+        is_friend=False,
+        friendship_status=None
+    )
 
-
-# ========== ЭНДПОИНТЫ ДЛЯ ДРУЗЕЙ (ТРЕБУЮТ АВТОРИЗАЦИЮ) ==========
-
-@router.post("/{user_id}/friend-request")
+@router.post("/{user_id}/friend-request", status_code=status.HTTP_201_CREATED)
 def send_friend_request(
-    user_id: str,
-    current_user: models.User = Depends(auth.get_current_active_user),
+    user_id: UUID,
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
-    Отправить запрос в друзья (только для авторизованных)
+    Отправить запрос в друзья (ТОЛЬКО ДЛЯ АВТОРИЗОВАННЫХ)
     """
-    try:
-        partner_uuid = UUID(user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    if current_user.id == user_id:
+        raise HTTPException(status_code=400, detail="Нельзя отправить запрос самому себе")
     
-    # Нельзя добавить в друзья самого себя
-    if current_user.id == partner_uuid:
-        raise HTTPException(status_code=400, detail="Cannot add yourself as friend")
+    target_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
     
-    # Проверяем, существует ли пользователь
-    partner = db.query(models.User).filter(models.User.id == partner_uuid).first()
-    if not partner:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Проверяем существующую дружбу
+    # Проверяем, есть ли уже существующая связь
     existing = db.query(models.Friend).filter(
-        or_(
-            and_(models.Friend.user_id == current_user.id, models.Friend.friend_id == partner.id),
-            and_(models.Friend.user_id == partner.id, models.Friend.friend_id == current_user.id)
-        )
+        ((models.Friend.user_id == current_user.id) & (models.Friend.friend_id == user_id)) |
+        ((models.Friend.user_id == user_id) & (models.Friend.friend_id == current_user.id))
     ).first()
     
     if existing:
-        if existing.status == "accepted":
-            raise HTTPException(status_code=400, detail="Already friends")
-        elif existing.status == "pending":
-            # Проверяем, кто отправил запрос
-            if existing.user_id == current_user.id:
-                raise HTTPException(status_code=400, detail="Friend request already sent")
-            else:
-                raise HTTPException(status_code=400, detail="This user already sent you a friend request")
-        elif existing.status == "rejected":
-            # Можно отправить повторно если было отклонено
-            existing.status = "pending"
-            existing.updated_at = datetime.utcnow()
+        # Если связь существует и её статус 'rejected', обновляем на 'pending'
+        if existing.status == 'rejected':
+            existing.status = 'pending'
+            existing.updated_at = db.func.now()
             db.commit()
-            return {"message": "Friend request sent again"}
+            return {"message": "Запрос в друзья отправлен", "request_id": existing.id}
+        else:
+            # Если статус 'pending' или 'accepted' - возвращаем ошибку
+            raise HTTPException(status_code=400, detail="Запрос в друзья уже существует")
     
-    # Создаем новый запрос
+    # Если связи нет, создаем новую
     friend_request = models.Friend(
         user_id=current_user.id,
-        friend_id=partner.id,
+        friend_id=user_id,
         status="pending"
     )
-    
     db.add(friend_request)
     db.commit()
     
-    return {"message": "Friend request sent successfully"}
+    return {"message": "Запрос в друзья отправлен", "request_id": friend_request.id}
 
-
-@router.get("/requests/received", response_model=List[schemas.FriendRequest])
-def get_received_friend_requests(
-    current_user: models.User = Depends(auth.get_current_active_user),
+@router.get("/friend-requests", response_model=List[schemas.FriendResponse])
+def get_friend_requests(
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
-    Получить входящие запросы в друзья
+    Получить входящие запросы в друзья (ТОЛЬКО ДЛЯ АВТОРИЗОВАННЫХ)
     """
+    print(f"🔵 Получение запросов для пользователя {current_user.id}")
+    print(f"🔵 Email пользователя: {current_user.email}")
+    
+    # Ищем запросы, где текущий пользователь - получатель (friend_id)
     requests = db.query(models.Friend).filter(
         models.Friend.friend_id == current_user.id,
         models.Friend.status == "pending"
     ).all()
     
-    result = []
-    for req in requests:
-        from_user = db.query(models.User).filter(models.User.id == req.user_id).first()
-        result.append({
-            "id": req.id,
-            "from_user": from_user,
-            "to_user": current_user,
-            "status": req.status,
-            "created_at": req.created_at
-        })
+    print(f"📊 Найдено запросов в БД: {len(requests)}")
     
-    return result
-
-
-@router.get("/requests/sent", response_model=List[schemas.FriendRequest])
-def get_sent_friend_requests(
-    current_user: models.User = Depends(auth.get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Получить исходящие запросы в друзья
-    """
-    requests = db.query(models.Friend).filter(
-        models.Friend.user_id == current_user.id,
-        models.Friend.status == "pending"
-    ).all()
+    for req in requests:
+        print(f"  - Запрос ID: {req.id}, отправитель: {req.user_id}")
     
     result = []
     for req in requests:
-        to_user = db.query(models.User).filter(models.User.id == req.friend_id).first()
-        result.append({
-            "id": req.id,
-            "from_user": current_user,
-            "to_user": to_user,
-            "status": req.status,
-            "created_at": req.created_at
-        })
+        sender = db.query(models.User).filter(models.User.id == req.user_id).first()
+        
+        if not sender:
+            print(f"❌ Отправитель не найден для user_id: {req.user_id}")
+            continue
+            
+        print(f"✅ Найден отправитель: {sender.username}")
+        
+        # Получаем аватар отправителя
+        avatar_url = "/static/default-avatar.png"
+        if sender.profile and sender.profile.avatar:
+            avatar_url = sender.profile.avatar
+        elif hasattr(sender, 'avatar') and sender.avatar:
+            avatar_url = sender.avatar
+        
+        # Получаем bio отправителя
+        bio = ""
+        if sender.profile and sender.profile.bio:
+            bio = sender.profile.bio
+        elif hasattr(sender, 'bio') and sender.bio:
+            bio = sender.bio
+        
+        # Создаем объект PartnerUser для отправителя
+        sender_partner = schemas.PartnerUser(
+            id=str(sender.id),
+            username=sender.username,
+            first_name=sender.first_name,
+            last_name=sender.last_name,
+            bio=bio,
+            avatar=avatar_url,
+            favorite_game=sender.favorite_game,
+            is_friend=False,
+            friendship_status="pending"
+        )
+        
+        # Создаем FriendResponse
+        req_data = schemas.FriendResponse(
+            id=req.id,
+            user_id=req.user_id,
+            friend_id=req.friend_id,
+            status=req.status,
+            created_at=req.created_at,
+            updated_at=req.updated_at,
+            user=sender_partner,
+            friend=None
+        )
+        result.append(req_data)
     
+    print(f"📦 Возвращаем {len(result)} запросов")
     return result
 
-
-@router.put("/{user_id}/friend-request/accept")
+@router.post("/friend-requests/{request_id}/accept")
 def accept_friend_request(
-    user_id: str,
-    current_user: models.User = Depends(auth.get_current_active_user),
+    request_id: int,
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
-    Принять запрос в друзья
+    Принять запрос в друзья (ТОЛЬКО ДЛЯ АВТОРИЗОВАННЫХ)
     """
-    try:
-        requester_uuid = UUID(user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
-    
     friend_request = db.query(models.Friend).filter(
-        models.Friend.user_id == requester_uuid,
+        models.Friend.id == request_id,
         models.Friend.friend_id == current_user.id,
         models.Friend.status == "pending"
     ).first()
     
     if not friend_request:
-        raise HTTPException(status_code=404, detail="Friend request not found")
+        raise HTTPException(status_code=404, detail="Запрос в друзья не найден")
     
     friend_request.status = "accepted"
-    friend_request.updated_at = datetime.utcnow()
+    friend_request.updated_at = db.func.now()
     db.commit()
     
-    return {"message": "Friend request accepted"}
+    return {"message": "Запрос в друзья принят"}
 
-
-@router.put("/{user_id}/friend-request/reject")
+@router.post("/friend-requests/{request_id}/reject")
 def reject_friend_request(
-    user_id: str,
-    current_user: models.User = Depends(auth.get_current_active_user),
+    request_id: int,
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
-    Отклонить запрос в друзья
+    Отклонить запрос в друзья (ТОЛЬКО ДЛЯ АВТОРИЗОВАННЫХ)
     """
-    try:
-        requester_uuid = UUID(user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
-    
     friend_request = db.query(models.Friend).filter(
-        models.Friend.user_id == requester_uuid,
+        models.Friend.id == request_id,
         models.Friend.friend_id == current_user.id,
         models.Friend.status == "pending"
     ).first()
     
     if not friend_request:
-        raise HTTPException(status_code=404, detail="Friend request not found")
+        raise HTTPException(status_code=404, detail="Запрос в друзья не найден")
     
     friend_request.status = "rejected"
-    friend_request.updated_at = datetime.utcnow()
+    friend_request.updated_at = db.func.now()
     db.commit()
     
-    return {"message": "Friend request rejected"}
-
+    return {"message": "Запрос в друзья отклонен"}
 
 @router.delete("/{user_id}/friend")
 def remove_friend(
-    user_id: str,
-    current_user: models.User = Depends(auth.get_current_active_user),
+    user_id: UUID,
+    current_user: models.User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
-    Удалить пользователя из друзей
+    Удалить из друзей (ТОЛЬКО ДЛЯ АВТОРИЗОВАННЫХ)
     """
-    try:
-        friend_uuid = UUID(user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
-    
     friendship = db.query(models.Friend).filter(
-        or_(
-            and_(models.Friend.user_id == current_user.id, models.Friend.friend_id == friend_uuid),
-            and_(models.Friend.user_id == friend_uuid, models.Friend.friend_id == current_user.id)
-        ),
+        ((models.Friend.user_id == current_user.id) & (models.Friend.friend_id == user_id)) |
+        ((models.Friend.user_id == user_id) & (models.Friend.friend_id == current_user.id)),
         models.Friend.status == "accepted"
     ).first()
     
     if not friendship:
-        raise HTTPException(status_code=404, detail="Friendship not found")
+        raise HTTPException(status_code=404, detail="Дружба не найдена")
     
     db.delete(friendship)
     db.commit()
     
-    return {"message": "Friend removed successfully"}
-
+    return {"message": "Пользователь удален из друзей"}
 
 @router.get("/{user_id}/friends", response_model=List[schemas.PartnerUser])
 def get_user_friends(
-    user_id: str,
+    user_id: UUID,
     db: Session = Depends(get_db)
 ):
     """
-    Получить список друзей пользователя (публичный эндпоинт)
+    Получить список друзей пользователя (публичный)
     """
-    try:
-        user_uuid = UUID(user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
-    
-    user = db.query(models.User).filter(models.User.id == user_uuid).first()
+    user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
     
-    # Находим все принятые дружеские связи
+    # Получаем все принятые дружеские связи
     friendships = db.query(models.Friend).filter(
-        or_(
-            models.Friend.user_id == user.id,
-            models.Friend.friend_id == user.id
-        ),
-        models.Friend.status == "accepted"
+        ((models.Friend.user_id == user_id) | (models.Friend.friend_id == user_id)) &
+        (models.Friend.status == "accepted")
     ).all()
     
     friends = []
     for friendship in friendships:
-        if friendship.user_id == user.id:
+        if friendship.user_id == user_id:
             friend = db.query(models.User).filter(models.User.id == friendship.friend_id).first()
         else:
             friend = db.query(models.User).filter(models.User.id == friendship.user_id).first()
         
         if friend:
-            friend_dict = {
-                "id": friend.id,
-                "email": friend.email,
-                "username": friend.username,
-                "first_name": friend.first_name,
-                "last_name": friend.last_name,
-                "bio": friend.bio,
-                "avatar": friend.avatar,
-                "favorite_game": friend.favorite_game,
-                "is_friend": True,
-                "friendship_status": "accepted"
-            }
-            friends.append(friend_dict)
+            # Получаем аватар из профиля
+            avatar_url = "/static/default-avatar.png"
+            if friend.profile and friend.profile.avatar:
+                avatar_url = friend.profile.avatar
+            elif hasattr(friend, 'avatar') and friend.avatar:
+                avatar_url = friend.avatar
+            
+            # Получаем bio из профиля
+            bio = ""
+            if friend.profile and friend.profile.bio:
+                bio = friend.profile.bio
+            elif hasattr(friend, 'bio') and friend.bio:
+                bio = friend.bio
+            
+            friend_data = schemas.PartnerUser(
+                id=str(friend.id),
+                username=friend.username,
+                first_name=friend.first_name,
+                last_name=friend.last_name,
+                bio=bio,
+                avatar=avatar_url,
+                favorite_game=friend.favorite_game,
+                is_friend=True,
+                friendship_status="accepted"
+            )
+            friends.append(friend_data)
     
     return friends
