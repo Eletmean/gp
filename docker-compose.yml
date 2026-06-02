@@ -17,7 +17,9 @@ services:
       - game_network
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     container_name: game_backend
     restart: always
     ports:
@@ -28,20 +30,18 @@ services:
     depends_on:
       - db
     volumes:
-      - ./backend:/app
       - static_volume:/app/static
     networks:
       - game_network
 
   frontend:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: game_frontend
     restart: always
     ports:
       - "80:80"
-    volumes:
-      - ./frontend/build:/usr/share/nginx/html
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - backend
     networks:
