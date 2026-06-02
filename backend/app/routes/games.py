@@ -26,6 +26,28 @@ def get_game(game_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Game not found")
     return game
 
+@router.post("/", response_model=schemas.Game, status_code=status.HTTP_201_CREATED)
+def create_game(
+    game: schemas.GameCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Создать новую игру"""
+    # Проверяем, не существует ли уже игра с таким именем
+    existing = db.query(models.Game).filter(models.Game.name == game.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Game with this name already exists")
+    
+    db_game = models.Game(
+        name=game.name,
+        image_url=game.image_url
+    )
+    db.add(db_game)
+    db.commit()
+    db.refresh(db_game)
+    
+    return db_game
+
 # Эндпоинты для игр пользователя (требуют авторизацию)
 @router.get("/my-games/", response_model=List[schemas.UserGameResponse])
 def get_my_games(
