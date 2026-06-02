@@ -1,11 +1,12 @@
 import time
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 from sqlalchemy import text
 
-from .routes import games, users, partners, user_games, posts  # Добавили posts
+from .routes import games, users, partners, user_games, posts
+from .routes import donations  # ДОБАВИТЬ импорт donations
 from .database import engine, Base
 
 # Ждем готовности базы данных
@@ -14,7 +15,6 @@ max_attempts = 10
 attempt = 0
 while attempt < max_attempts:
     try:
-        # Пробуем подключиться к базе данных
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         print("Database is ready!")
@@ -34,18 +34,18 @@ print("Tables created successfully!")
 
 app = FastAPI(title="Game Platform API")
 
-# CORS
+# ВРЕМЕННО: Разрешаем все источники CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:80", "*"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Static files for avatars and posts
+# Static files
 os.makedirs("static/avatars", exist_ok=True)
-os.makedirs("static/posts", exist_ok=True)  # Добавили папку для постов
+os.makedirs("static/posts", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Routes
@@ -53,7 +53,8 @@ app.include_router(games.router)
 app.include_router(users.router)
 app.include_router(partners.router)
 app.include_router(user_games.router)
-app.include_router(posts.router)  # Добавили роутер для постов
+app.include_router(posts.router)
+app.include_router(donations.router)  # ДОБАВИТЬ регистрацию роутера donations
 
 @app.get("/")
 async def root():

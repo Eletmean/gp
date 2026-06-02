@@ -5,7 +5,7 @@ import { getAvatarUrl, handleImageError } from '../../utils/avatar';
 import '../../styles/Header.css';
 
 const Header: React.FC = () => {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
   return (
     <header className="header">
@@ -38,9 +38,7 @@ const Header: React.FC = () => {
                 />
                 <span>{user?.username}</span>
               </Link>
-              <button onClick={logout} className="btn btn-secondary">
-                Выйти
-              </button>
+              {/* Кнопка "Выйти" удалена из хедера - теперь только в профиле */}
             </div>
           ) : (
             <div className="auth-buttons">

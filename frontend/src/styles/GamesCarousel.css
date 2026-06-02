@@ -1,3 +1,5 @@
+/* GamesCarousel.css */
+
 .games-carousel {
   width: 100%;
   padding: 20px 0;
@@ -9,45 +11,24 @@
   justify-content: space-between;
   align-items: center;
   padding: 0 20px 20px;
-  /* Убрано: border-bottom: 1px solid #333; */
 }
 
 .carousel-header h2 {
-  color: white; 
+  color: white;
   font-size: 24px;
   margin: 0;
 }
 
+/* Скрываем кнопки управления */
 .carousel-controls {
-  display: flex;
-  gap: 10px;
-}
-
-.control-btn {
-  background: rgba(51, 51, 51, 0.7); 
-  border: none;
-  color: white;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-size: 20px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(5px); /* Эффект размытия фона */
-}
-
-.control-btn:hover {
-  background: rgba(85, 85, 85, 0.9);
-  transform: scale(1.1);
+  display: none;
 }
 
 .carousel-container {
   width: 100%;
   overflow: hidden;
   padding: 20px 0;
+  position: relative;
 }
 
 .carousel-track {
@@ -60,22 +41,25 @@
   padding: 0 10px;
   box-sizing: border-box;
   cursor: pointer;
+  width: 20%; /* 100% / 5 (по умолчанию 5 карточек) */
 }
 
 .game-image {
   position: relative;
   width: 100%;
-  aspect-ratio: 16/9;
-  border-radius: 12px; /* Увеличим скругление углов */
+  aspect-ratio: 3/4;
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); 
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
-/* Если есть фоновая картинка, скрываем текст */
 .game-image[style*="background-image"] .game-title {
   display: none;
 }
@@ -85,6 +69,30 @@
   font-size: 18px;
   font-weight: bold;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 8px;
+  position: absolute;
+  bottom: 20px;
+  left: 10px;
+  right: 10px;
+}
+
+.game-info {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.game-name {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.3s ease;
 }
 
 .game-card:hover .game-image {
@@ -92,21 +100,134 @@
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
 }
 
-.loading, .no-games {
+.game-card:hover .game-name {
+  color: #4CAF50;
+}
+
+/* Индикаторы карусели */
+.carousel-indicators {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 10px 0;
+}
+
+.indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+}
+
+.indicator.active {
+  background: white;
+  width: 20px;
+  border-radius: 4px;
+}
+
+.indicator:hover {
+  background: rgba(255, 255, 255, 0.6);
+  transform: scale(1.2);
+}
+
+/* Состояния загрузки и ошибок */
+.loading, .no-games, .carousel-empty {
   text-align: center;
   padding: 40px;
   color: #aaa;
   font-size: 18px;
 }
 
-/* Адаптивность */
-@media (max-width: 1024px) {
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 10px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.retry-btn {
+  margin-top: 10px;
+  padding: 8px 16px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s ease;
+}
+
+.retry-btn:hover {
+  background: #45a049;
+}
+
+.carousel-error {
+  text-align: center;
+  padding: 40px;
+  color: #ff6b6b;
+}
+
+/* ========== АДАПТИВНОСТЬ ========== */
+
+/* Для планшетов и небольших ноутбуков */
+@media (max-width: 1200px) {
   .game-card {
-    padding: 0 8px;
+    width: 25%; /* 4 карточки */
+  }
+  
+  .game-title {
+    font-size: 16px;
+    bottom: 15px;
+  }
+  
+  .game-name {
+    font-size: 13px;
   }
 }
 
+/* Для планшетов */
+@media (max-width: 1024px) {
+  .carousel-header h2 {
+    font-size: 22px;
+  }
+  
+  .game-card {
+    width: 25%; /* 4 карточки */
+    padding: 0 8px;
+  }
+  
+  .game-title {
+    font-size: 15px;
+    padding: 8px;
+  }
+}
+
+/* Для больших планшетов и маленьких ноутбуков */
+@media (max-width: 900px) {
+  .game-card {
+    width: 33.333%; /* 3 карточки */
+  }
+}
+
+/* Для мобильных устройств */
 @media (max-width: 768px) {
+  .games-carousel {
+    margin: 10px 0;
+    padding: 15px 0;
+  }
+  
   .carousel-header {
     padding: 0 15px 15px;
   }
@@ -116,30 +237,134 @@
   }
   
   .game-card {
+    width: 33.333%; /* 3 карточки */
     padding: 0 5px;
   }
   
   .game-title {
+    font-size: 14px;
+    bottom: 10px;
+    padding: 6px;
+  }
+  
+  .game-name {
+    font-size: 12px;
+  }
+  
+  .carousel-indicators {
+    gap: 8px;
+    margin-top: 15px;
+  }
+  
+  .indicator {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .indicator.active {
+    width: 16px;
+  }
+  
+  .loading, .no-games, .carousel-empty {
+    padding: 30px;
     font-size: 16px;
+  }
+  
+  .loading-spinner {
+    width: 35px;
+    height: 35px;
   }
 }
 
-@media (max-width: 480px) {
-  .games-carousel {
-    margin: 10px 0;
-    padding: 15px 0;
+/* Для маленьких мобильных устройств */
+@media (max-width: 580px) {
+  .game-card {
+    width: 50%; /* 2 карточки */
   }
   
-  .carousel-header {
-    padding: 0 10px 15px;
+  .carousel-header h2 {
+    font-size: 18px;
   }
   
   .game-title {
+    font-size: 13px;
+    bottom: 8px;
+    padding: 5px;
+  }
+  
+  .game-name {
+    font-size: 11px;
+  }
+}
+
+/* Для очень маленьких мобильных устройств */
+@media (max-width: 480px) {
+  .games-carousel {
+    margin: 5px 0;
+    padding: 10px 0;
+  }
+  
+  .carousel-header {
+    padding: 0 10px 10px;
+  }
+  
+  .carousel-header h2 {
+    font-size: 16px;
+  }
+  
+  .game-card {
+    padding: 0 4px;
+  }
+  
+  .game-title {
+    font-size: 11px;
+    bottom: 5px;
+    padding: 4px;
+  }
+  
+  .game-name {
+    font-size: 10px;
+  }
+  
+  .loading, .no-games, .carousel-empty {
+    padding: 20px;
     font-size: 14px;
   }
   
-  .loading, .no-games {
-    padding: 20px;
-    font-size: 16px;
+  .loading-spinner {
+    width: 30px;
+    height: 30px;
   }
+  
+  .carousel-indicators {
+    gap: 6px;
+    margin-top: 12px;
+  }
+  
+  .indicator {
+    width: 5px;
+    height: 5px;
+  }
+  
+  .indicator.active {
+    width: 12px;
+  }
+}
+
+/* Анимация при наведении на карточку */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.game-card {
+  animation: fadeInUp 0.5s ease forwards;
+  animation-delay: calc(var(--index, 0) * 0.05s);
+  opacity: 0;
 }

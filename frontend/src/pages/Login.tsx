@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Formik, Form, Field, ErrorMessage, FormikHelpers } from 'formik';
 import * as Yup from 'yup';
 import { authAPI } from '../services/api';
@@ -18,41 +19,42 @@ const LoginSchema = Yup.object().shape({
 });
 
 const Login: React.FC = () => {
-  const { login: authLogin } = useAuth(); // используем login из контекста (переименовываем чтобы не было конфликта)
+  const navigate = useNavigate();
+  const { login: authLogin } = useAuth();
 
   const handleSubmit = async (
     values: LoginFormValues,
-    { setSubmitting, setErrors }: FormikHelpers<LoginFormValues>
+    { setSubmitting, setErrors, setFieldError }: FormikHelpers<LoginFormValues>
   ) => {
     try {
       console.log('Отправка данных входа:', values);
       const response = await authAPI.login(values);
       console.log('Ответ сервера при входе:', response.data);
       
-      // FastAPI возвращает { access_token: "...", token_type: "bearer" }
       const { access_token } = response.data;
       
-      // Сохраняем токен
       localStorage.setItem('access_token', access_token);
       
-      // Получаем данные пользователя
       const userResponse = await authAPI.getProfile();
       console.log('Данные пользователя:', userResponse.data);
       
-      // Сохраняем пользователя
       localStorage.setItem('user', JSON.stringify(userResponse.data));
       
-      // Обновляем контекст авторизации
       authLogin(userResponse.data);
       
       console.log('Токен сохранён, перенаправление на профиль...');
       
-      // Перенаправляем на профиль
-      window.location.href = '/profile';
+      // Используем navigate вместо window.location.href (без перезагрузки)
+      navigate('/profile');
     } catch (error: any) {
       console.error('Ошибка входа:', error);
+      
       if (error.response?.status === 401) {
-        setErrors({ email: 'Неверный email или пароль' });
+        // Показываем ошибку под обоими полями
+        setErrors({ 
+          email: 'Неверный email или пароль',
+          password: 'Неверный email или пароль'
+        });
       } else {
         setErrors({ email: 'Ошибка входа. Попробуйте снова.' });
       }
@@ -62,7 +64,7 @@ const Login: React.FC = () => {
 
   return (
     <div className="page-wrapper">
-      <Header /> {/* Header сам получает данные из контекста */}
+      <Header />
       
       <main className="main-content">
         <div className="auth-container">

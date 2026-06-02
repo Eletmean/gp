@@ -1,0 +1,129 @@
+.auth-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.auth-modal-content {
+  background: var(--card-bg);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.auth-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.auth-modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-primary);
+}
+
+.auth-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.auth-modal-close:hover {
+  background: var(--primary-bg);
+  color: var(--text-primary);
+}
+
+.auth-modal-body {
+  padding: 24px;
+  text-align: center;
+}
+
+.auth-modal-body p {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.auth-modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.auth-modal-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.login-btn {
+  background: var(--accent-purple);
+  color: white;
+  border: none;
+}
+
+.login-btn:hover {
+  background: var(--accent-purple-light);
+  transform: translateY(-1px);
+}
+
+.register-btn {
+  background: transparent;
+  color: var(--accent-purple);
+  border: 1px solid var(--accent-purple);
+}
+
+.register-btn:hover {
+  background: rgba(108, 99, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 480px) {
+  .auth-modal-footer {
+    flex-direction: column;
+  }
+  
+  .auth-modal-btn {
+    width: 100%;
+  }
+}

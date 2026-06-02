@@ -5,11 +5,11 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/';
 // ===== ТИПЫ =====
 
 export interface User {
-  id: string | number;
+  id: string;
   username: string;
   email: string;
   first_name: string;
-  last_name: string;
+  last_name?: string;
   bio?: string;
   avatar?: string;
   favorite_game?: string;
@@ -49,19 +49,18 @@ export interface PostImage {
 }
 
 export interface PostAuthor {
-  id: string | number;
+  id: string;
   username: string;
   first_name: string;
-  last_name: string;
   avatar?: string;
 }
 
 export interface Post {
   id: number;
-  author_id: string | number;
+  author_id: string;
   author: PostAuthor;
   content: string;
-  privacy: 'public' | 'friends' | 'private';
+  privacy: 'public' | 'friends' | 'donators';
   images: PostImage[];
   comments: Comment[];
   likes: any[];
@@ -72,11 +71,20 @@ export interface Post {
   updated_at?: string;
 }
 
+export interface CommentAuthor {
+  id: string;
+  username: string;
+  first_name: string;
+  avatar?: string;
+}
+
 export interface Comment {
   id: number;
   post_id: number;
-  author_id: string | number;
-  author: PostAuthor;
+  author_id: string;
+  author: CommentAuthor;
+  parent_id?: number;
+  replies?: Comment[];
   content: string;
   created_at: string;
   updated_at?: string;
@@ -93,7 +101,6 @@ export interface Friend {
   id: string;
   username: string;
   first_name: string;
-  last_name: string;
   avatar: string;
   is_friend?: boolean;
   friendship_status?: string | null;
@@ -101,18 +108,27 @@ export interface Friend {
 
 export interface FriendRequest {
   id: number;
-  from_user: User;
-  to_user: User;
+  user_id: string;
+  friend_id: string;
   status: 'pending' | 'accepted' | 'rejected';
   created_at: string;
+  updated_at?: string;
+  user?: {
+    id: string;
+    username: string;
+    first_name: string;
+    bio?: string;
+    avatar: string;
+    favorite_game?: string | null;
+    is_friend?: boolean;
+    friendship_status?: string | null;
+  };
 }
 
 export interface Partner {
   id: string;
   username: string;
   first_name: string;
-  last_name: string;
-  email: string;
   bio: string;
   avatar: string;
   favorite_game: string | null;
@@ -128,11 +144,68 @@ export interface PartnerProfile {
   friendship_status: string | null;
 }
 
+// Donation types
+export interface SubscriptionTier {
+  id: number;
+  name: string;
+  price: number;
+  duration_days: number;
+  icon: string;
+  color: string;
+  benefits: string[];
+}
+
+export interface DonatorStatus {
+  is_donator: boolean;
+  tier: string | null;
+  expires_at: string | null;
+}
+
+export interface MySubscription {
+  id: number;
+  creator_id: string;
+  creator_name: string;
+  creator_avatar: string | null;
+  tier: string | null;
+  amount: number;
+  expires_at: string | null;
+}
+
+export interface MyDonator {
+  id: number;
+  donator_id: string;
+  donator_name: string;
+  donator_avatar: string | null;
+  tier: string | null;
+  amount: number;
+  created_at: string;
+}
+
+export interface GalleryImage {
+  id: number;
+  post_id: number;
+  image_url: string;
+  created_at: string;
+}
+
+export interface UserTier {
+  id: number;
+  user_id: string;
+  tier_id: number;
+  name: string;
+  price: number;
+  duration_days: number;
+  icon: string;
+  color: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 // ===== НАСТРОЙКА AXIOS =====
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -156,7 +229,6 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // Список публичных путей, которые не должны редиректить
     const publicPaths = [
       '/games/',
       '/partners/',
@@ -165,19 +237,16 @@ api.interceptors.response.use(
       '/posts/'
     ];
     
-    // Проверяем, является ли запрос публичным
     const isPublicPath = publicPaths.some(path => 
       originalRequest.url?.includes(path)
     );
     
-    // Если это 401 и запрос НЕ публичный - редиректим
     if (error.response?.status === 401 && !originalRequest._retry && !isPublicPath) {
       originalRequest._retry = true;
       clearAuthTokens();
       window.location.href = '/login';
     }
     
-    // Для публичных путей просто возвращаем ошибку
     return Promise.reject(error);
   }
 );
@@ -188,7 +257,6 @@ export const authAPI = {
     email: string;
     username: string;
     first_name: string;
-    last_name: string;
     password: string;
   }) => api.post<User>('users/register', data),
   
@@ -209,18 +277,17 @@ export const authAPI = {
 
 // ===== USERS API =====
 export const usersAPI = {
-  getUser: (userId: string | number) =>
+  getUser: (userId: string) =>
     api.get<User>(`users/${userId}`),
   
-  // Добавить метод удаления профиля
   deleteProfile: () => 
     api.delete('users/me'),
 };
 
 // ===== PARTNERS API =====
 export const partnersAPI = {
-  getAll: (skip = 0, limit = 20, game?: string) => 
-    api.get<Partner[]>('partners/', { params: { skip, limit, game } }),
+  getAll: (skip = 0, limit = 20, game?: string, search?: string) => 
+    api.get<Partner[]>('partners/', { params: { skip, limit, game, search } }),
   
   search: (query: string) => 
     api.get<Partner[]>('partners/search', { params: { query } }),
@@ -231,15 +298,12 @@ export const partnersAPI = {
   sendFriendRequest: (userId: string) => 
     api.post(`partners/${userId}/friend-request`),
   
-  // Получить входящие запросы в друзья
   getFriendRequests: () => 
     api.get<FriendRequest[]>('partners/friend-requests'),
   
-  // Принять запрос в друзья
   acceptFriendRequest: (requestId: number) => 
     api.post(`partners/friend-requests/${requestId}/accept`),
   
-  // Отклонить запрос в друзья
   rejectFriendRequest: (requestId: number) => 
     api.post(`partners/friend-requests/${requestId}/reject`),
   
@@ -272,6 +336,9 @@ export const gamesAPI = {
   
   getUserGames: () => api.get<UserGame[]>('games/my-games/'),
   
+  getUserGamesById: (userId: string) => 
+    api.get<UserGame[]>(`/games/user/${userId}/games`),
+  
   addUserGame: (data: { game_id: number; hours_played?: number }) =>
     api.post<UserGame>('games/my-games/', data),
   
@@ -284,19 +351,18 @@ export const gamesAPI = {
 
 // ===== POSTS API =====
 export const postsAPI = {
-  // Получить ленту постов
   getPosts: (page = 1, perPage = 10) => 
     api.get<PostListResponse>('/posts/', { params: { page, per_page: perPage } }),
   
-  // Получить посты пользователя
-  getUserPosts: (userId: string | number, page = 1, perPage = 10) => 
+  getUserPosts: (userId: string, page = 1, perPage = 10) => 
     api.get<PostListResponse>(`/posts/user/${userId}`, { params: { page, per_page: perPage } }),
   
-  // Получить конкретный пост
+  getUserGallery: (userId: string) => 
+    api.get<GalleryImage[]>(`/posts/user/${userId}/gallery`),
+  
   getPost: (postId: number) => 
     api.get<Post>(`/posts/${postId}`),
   
-  // Создать пост
   createPost: (formData: FormData) => 
     api.post<Post>('/posts/', formData, {
       headers: {
@@ -304,39 +370,56 @@ export const postsAPI = {
       },
     }),
   
-  // Обновить пост
   updatePost: (postId: number, data: { content?: string; privacy?: string }) => 
     api.put<Post>(`/posts/${postId}`, data),
   
-  // Удалить пост
   deletePost: (postId: number) => 
     api.delete(`/posts/${postId}`),
   
-  // Лайкнуть пост
   likePost: (postId: number) => 
     api.post(`/posts/${postId}/like`),
   
-  // Убрать лайк
   unlikePost: (postId: number) => 
     api.delete(`/posts/${postId}/like`),
   
-  // Добавить комментарий
-  addComment: (postId: number, content: string) => 
-    api.post<Comment>(`/posts/${postId}/comments`, { content }),
+  addComment: (postId: number, content: string, parentId?: number) => 
+    api.post<Comment>(`/posts/${postId}/comments`, { content }, { params: parentId ? { parent_id: parentId } : {} }),
   
-  // Удалить комментарий
   deleteComment: (commentId: number) => 
-    api.delete(`/comments/${commentId}`),
+    api.delete(`/posts/comments/${commentId}`),
 };
 
-// ===== FRIENDS API =====
-export const friendsAPI = {
-  getFriends: () => Promise.resolve({ data: [] }),
-  getFriendRequests: () => Promise.resolve({ data: [] }),
-  sendFriendRequest: () => Promise.reject('Not implemented'),
-  acceptFriendRequest: () => Promise.reject('Not implemented'),
-  rejectFriendRequest: () => Promise.reject('Not implemented'),
-  removeFriend: () => Promise.reject('Not implemented'),
+// ===== DONATIONS API =====
+export const donationsAPI = {
+  getTiers: () => 
+    api.get<SubscriptionTier[]>('/donations/tiers'),
+  
+  getPublicTiers: () => 
+    api.get<SubscriptionTier[]>('/donations/tiers/public'),
+  
+  getCustomTiers: () => 
+    api.get<UserTier[]>('/donations/tiers/custom'),
+  
+  updateTier: (tierId: number, data: { name: string; price: number; duration_days: number }) =>
+    api.put(`/donations/tiers/${tierId}`, data),
+  
+  subscribe: (userId: string, tierId: number) => 
+    api.post('/donations/subscribe', { user_id: userId, tier_id: tierId }),
+  
+  oneTimeDonate: (userId: string, amount: number) => 
+    api.post('/donations/one-time', { user_id: userId, amount }),
+  
+  checkDonator: (userId: string) => 
+    api.get<DonatorStatus>(`/donations/check/${userId}`),
+  
+  getMySubscriptions: () => 
+    api.get<MySubscription[]>('/donations/my-subscriptions'),
+  
+  getMyDonators: () => 
+    api.get<MyDonator[]>('/donations/my-donators'),
+  
+  cancelSubscription: (userId: string) => 
+    api.delete(`/donations/subscription/${userId}`),
 };
 
 // ===== УТИЛИТЫ =====
@@ -386,7 +469,6 @@ export const register = async (data: {
   email: string;
   username: string;
   first_name: string;
-  last_name: string;
   password: string;
 }) => {
   await authAPI.register(data);

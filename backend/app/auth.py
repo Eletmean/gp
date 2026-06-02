@@ -17,7 +17,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/login", auto_error=False)  # auto_error=False важно!
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/login", auto_error=False)
 
 def get_password_hash(password: str) -> str:
     """
@@ -133,11 +133,10 @@ async def get_current_user_optional(
         email: str = payload.get("sub")
         if email is None:
             return None
-        token_data = schemas.TokenData(email=email)
     except JWTError:
         return None
     
-    user = db.query(models.User).filter(models.User.email == token_data.email).first()
+    user = db.query(models.User).filter(models.User.email == email).first()
     return user
 
 async def get_current_active_user(

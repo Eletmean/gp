@@ -14,11 +14,11 @@ interface Game {
   color?: string;
 }
 
+// Убрали last_name
 interface Partner {
   id: string;
   username: string;
   first_name: string;
-  last_name: string;
   bio: string;
   avatar: string;
   favorite_game: string | null;
@@ -28,31 +28,28 @@ interface Partner {
 
 interface Filters {
   game: string;
-  sortBy: string;
   search: string;
-  rank: string;
 }
 
 const Home: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [profiles, setProfiles] = useState<Partner[]>([]);
+  const [allProfiles, setAllProfiles] = useState<Partner[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [filters, setFilters] = useState<Filters>({
     game: '',
-    sortBy: 'rating',
-    search: '',
-    rank: ''
+    search: ''
   });
-  const [showFilters, setShowFilters] = useState<boolean>(false);
 
   useEffect(() => {
     loadGames();
+    loadProfiles();
   }, []);
 
   useEffect(() => {
-    loadProfiles();
-  }, []);
+    applyFilters();
+  }, [allProfiles, filters]);
 
   const loadGames = async () => {
     try {
@@ -72,12 +69,39 @@ const Home: React.FC = () => {
       setLoading(true);
       const response = await partnersAPI.getAll();
       console.log('Загруженные партнеры:', response.data);
-      setProfiles(response.data);
+      
+      let partnersList = response.data;
+      // Исключаем текущего пользователя
+      if (user && user.id) {
+        partnersList = partnersList.filter((partner: Partner) => partner.id !== String(user.id));
+      }
+      
+      setAllProfiles(partnersList);
     } catch (error) {
       console.error('Error loading profiles:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...allProfiles];
+
+    if (filters.search) {
+      const query = filters.search.toLowerCase();
+      filtered = filtered.filter(profile => 
+        profile.username.toLowerCase().includes(query) ||
+        profile.first_name.toLowerCase().includes(query)
+      );
+    }
+
+    if (filters.game) {
+      filtered = filtered.filter(profile => 
+        profile.favorite_game === games.find(g => g.id === parseInt(filters.game))?.name
+      );
+    }
+
+    setProfiles(filtered);
   };
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
@@ -94,24 +118,21 @@ const Home: React.FC = () => {
   const clearAllFilters = () => {
     setFilters({
       game: '',
-      sortBy: 'rating',
-      search: '',
-      rank: ''
+      search: ''
     });
   };
 
-  const hasActiveFilters = filters.search || filters.game || filters.rank || filters.sortBy !== 'rating';
+  const hasActiveFilters = filters.search || filters.game;
 
   const handleSendFriendRequest = async (partnerId: string) => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
+    if (!isAuthenticated) {
       alert('Чтобы добавить в друзья, нужно войти в систему');
       return;
     }
 
     try {
       await partnersAPI.sendFriendRequest(partnerId);
-      setProfiles(prev => prev.map(p => 
+      setAllProfiles(prev => prev.map(p => 
         p.id === partnerId ? { ...p, friendship_status: 'pending' } : p
       ));
     } catch (err: any) {
@@ -121,15 +142,14 @@ const Home: React.FC = () => {
   };
 
   const handleRemoveFriend = async (partnerId: string) => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
+    if (!isAuthenticated) {
       alert('Чтобы удалить из друзей, нужно войти в систему');
       return;
     }
 
     try {
       await partnersAPI.removeFriend(partnerId);
-      setProfiles(prev => prev.map(p => 
+      setAllProfiles(prev => prev.map(p => 
         p.id === partnerId ? { ...p, is_friend: false, friendship_status: null } : p
       ));
     } catch (err: any) {
@@ -140,7 +160,6 @@ const Home: React.FC = () => {
 
   const handleVideoButtonClick = () => {
     console.log('Кнопка видео нажата');
-    // Здесь потом будет логика открытия видео
     alert('Функция открытия видео будет добавлена позже');
   };
 
@@ -185,114 +204,49 @@ const Home: React.FC = () => {
           <GamesCarousel />
 
           <section className="filters-section">
-            <div className="filters-header">
-              <div className="search-box compact">
+            <div className="filters-row">
+              <div className="search-box">
                 <input
                   type="text"
-                  placeholder="Поиск по нику, игре..."
+                  placeholder="Поиск по нику, имени..."
                   value={filters.search}
                   onChange={handleSearchChange}
                   className="search-input"
                 />
               </div>
               
-              <div className="filter-buttons">
-                <button 
-                  className={`filter-toggle ${showFilters ? 'active' : ''}`}
-                  onClick={() => setShowFilters(!showFilters)}
+              <div className="game-filter">
+                <select 
+                  value={filters.game}
+                  onChange={(e) => handleFilterChange('game', e.target.value)}
+                  className="game-select"
                 >
-                  Фильтры
-                  {hasActiveFilters && <span className="filter-badge"></span>}
-                </button>
-                
-                {hasActiveFilters && (
-                  <button className="clear-filters" onClick={clearAllFilters}>
-                    Сбросить
-                  </button>
-                )}
+                  <option value="">Все игры</option>
+                  {games.map(game => (
+                    <option key={game.id} value={game.id}>
+                      {game.name}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {hasActiveFilters && (
+                <button className="clear-filters-btn" onClick={clearAllFilters}>
+                  Сбросить ✕
+                </button>
+              )}
             </div>
 
-            {showFilters && (
-              <div className="filters-expanded">
-                <div className="filters-grid compact">
-                  <div className="filter-group compact">
-                    <select 
-                      value={filters.game}
-                      onChange={(e) => handleFilterChange('game', e.target.value)}
-                      className="filter-select"
-                    >
-                      <option value="">Все игры</option>
-                      {games.map(game => (
-                        <option key={game.id} value={game.id}>
-                          {game.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="filter-group compact">
-                    <select 
-                      value={filters.sortBy}
-                      onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                      className="filter-select"
-                    >
-                      <option value="rating">По рейтингу</option>
-                      <option value="rank">По рангу</option>
-                      <option value="playtime">По времени в игре</option>
-                      <option value="followers">По подписчикам</option>
-                      <option value="newest">Сначала новые</option>
-                    </select>
-                  </div>
-
-                  <div className="filter-group compact">
-                    <select 
-                      value={filters.rank}
-                      onChange={(e) => handleFilterChange('rank', e.target.value)}
-                      className="filter-select"
-                    >
-                      <option value="">Любой ранг</option>
-                      <option value="beginner">Начинающий</option>
-                      <option value="intermediate">Средний</option>
-                      <option value="advanced">Продвинутый</option>
-                      <option value="expert">Эксперт</option>
-                      <option value="pro">Профессионал</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {hasActiveFilters && (
-              <div className="active-filters compact">
+              <div className="active-filters-simple">
                 {filters.search && (
-                  <span className="active-filter">
+                  <span className="active-filter-badge">
                     Поиск: "{filters.search}"
-                    <button onClick={() => handleFilterChange('search', '')}>×</button>
                   </span>
                 )}
                 {filters.game && (
-                  <span className="active-filter">
+                  <span className="active-filter-badge">
                     Игра: {games.find(g => g.id === parseInt(filters.game))?.name}
-                    <button onClick={() => handleFilterChange('game', '')}>×</button>
-                  </span>
-                )}
-                {filters.rank && (
-                  <span className="active-filter">
-                    Ранг: {filters.rank}
-                    <button onClick={() => handleFilterChange('rank', '')}>×</button>
-                  </span>
-                )}
-                {filters.sortBy !== 'rating' && (
-                  <span className="active-filter">
-                    Сортировка: {
-                      filters.sortBy === 'rank' ? 'По рангу' :
-                      filters.sortBy === 'playtime' ? 'По времени в игре' :
-                      filters.sortBy === 'followers' ? 'По подписчикам' :
-                      filters.sortBy === 'newest' ? 'Сначала новые' :
-                      filters.sortBy
-                    }
-                    <button onClick={() => handleFilterChange('sortBy', 'rating')}>×</button>
                   </span>
                 )}
               </div>
@@ -317,7 +271,7 @@ const Home: React.FC = () => {
             ) : profiles.length === 0 ? (
               <div className="empty-state">
                 <h3>Игроки не найдены</h3>
-                <p>Попробуйте изменить параметры поиска или фильтры</p>
+                <p>Попробуйте изменить параметры поиска</p>
               </div>
             ) : (
               <div className="profiles-grid">
@@ -328,6 +282,7 @@ const Home: React.FC = () => {
                     onSendRequest={handleSendFriendRequest}
                     onRemoveFriend={handleRemoveFriend}
                     isAuthenticated={isAuthenticated}
+                    currentUserId={user?.id ? String(user.id) : undefined}
                   />
                 ))}
               </div>

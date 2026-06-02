@@ -25,7 +25,6 @@ const EditProfile: React.FC = () => {
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   const [formData, setFormData] = useState({
     first_name: '',
-    last_name: '',
     bio: '',
     favorite_game: '',
   });
@@ -52,7 +51,6 @@ const EditProfile: React.FC = () => {
       
       setFormData({
         first_name: userData.first_name || '',
-        last_name: userData.last_name || '',
         bio: userData.bio || '',
         favorite_game: userData.favorite_game || '',
       });
@@ -130,7 +128,7 @@ const EditProfile: React.FC = () => {
     try {
       await gamesAPI.addUserGame({ game_id: Number(selectedGameToAdd), hours_played: 0 });
       await fetchUserGames();
-      setSelectedGameToAdd(''); // Сбрасываем выбор после добавления
+      setSelectedGameToAdd('');
     } catch (error) {
       console.error('Error adding game:', error);
       alert('Ошибка при добавлении игры');
@@ -154,10 +152,6 @@ const EditProfile: React.FC = () => {
       newErrors.first_name = 'Имя обязательно';
     }
     
-    if (!formData.last_name.trim()) {
-      newErrors.last_name = 'Фамилия обязательна';
-    }
-    
     if (formData.bio.length > 1000) {
       newErrors.bio = 'Био не должно превышать 1000 символов';
     }
@@ -178,7 +172,6 @@ const EditProfile: React.FC = () => {
     try {
       const formDataToSend = new FormData();
       formDataToSend.append('first_name', formData.first_name);
-      formDataToSend.append('last_name', formData.last_name);
       formDataToSend.append('bio', formData.bio);
       formDataToSend.append('favorite_game', formData.favorite_game);
       
@@ -304,20 +297,6 @@ const EditProfile: React.FC = () => {
                       required
                     />
                     {errors.first_name && <span className="error-message">{errors.first_name}</span>}
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="last_name" className="form-label">Фамилия *</label>
-                    <input
-                      id="last_name"
-                      type="text"
-                      name="last_name"
-                      value={formData.last_name}
-                      onChange={handleInputChange}
-                      className={`form-input ${errors.last_name ? 'error' : ''}`}
-                      required
-                    />
-                    {errors.last_name && <span className="error-message">{errors.last_name}</span>}
                   </div>
                 </div>
                 

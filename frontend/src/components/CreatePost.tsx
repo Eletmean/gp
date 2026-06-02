@@ -15,21 +15,17 @@ const CreatePost: React.FC<CreatePostProps> = ({ onClose, onPostCreated }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Получаем текущего пользователя из localStorage
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const files = Array.from(e.target.files);
       
-      // Ограничиваем до 10 файлов
       const newFiles = [...imageFiles, ...files].slice(0, 10);
       setImageFiles(newFiles);
       
-      // Создаем превью для новых файлов
       const newPreviews = newFiles.map(file => URL.createObjectURL(file));
       
-      // Очищаем старые превью
       imagePreviews.forEach(url => URL.revokeObjectURL(url));
       
       setImagePreviews(newPreviews);
@@ -40,7 +36,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ onClose, onPostCreated }) => {
     const newFiles = imageFiles.filter((_, i) => i !== index);
     const newPreviews = imagePreviews.filter((_, i) => i !== index);
     
-    // Очищаем URL удаленного изображения
     URL.revokeObjectURL(imagePreviews[index]);
     
     setImageFiles(newFiles);
@@ -63,7 +58,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ onClose, onPostCreated }) => {
       formData.append('content', content);
       formData.append('privacy', privacy);
       
-      // Добавляем изображения, если они есть
       imageFiles.forEach(file => {
         formData.append('images', file);
       });
@@ -104,16 +98,16 @@ const CreatePost: React.FC<CreatePostProps> = ({ onClose, onPostCreated }) => {
               className="create-post-modal-avatar"
               onError={handleImageError}
             />
-            <div>
-              <h3>{currentUser?.username || 'Пользователь'}</h3>
+            <div className="create-post-author-info">
+              <h3 className="create-post-author-name">{currentUser?.username || 'Пользователь'}</h3>
               <select 
                 className="post-privacy-select"
                 value={privacy}
                 onChange={(e) => setPrivacy(e.target.value)}
               >
-                <option value="public">🌐 Публичный</option>
-                <option value="friends">👥 Друзья</option>
-                <option value="private">🔒 Только я</option>
+                <option value="public">Публичный</option>
+                <option value="friends">Только друзья</option>
+                <option value="donators">Для донатеров</option>
               </select>
             </div>
           </div>
@@ -126,10 +120,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ onClose, onPostCreated }) => {
             rows={6}
           />
           
-          {/* Превью фотографий */}
           {imagePreviews.length > 0 && (
             <div className="post-photos-preview">
-              <h4>Фотографии ({imageFiles.length}/10)</h4>
+              <h4 className="photos-preview-title">Фотографии ({imageFiles.length}/10)</h4>
               <div className="photos-preview-grid">
                 {imagePreviews.map((url, index) => (
                   <div key={index} className="photo-preview-item">

@@ -7,7 +7,6 @@ interface Partner {
   id: string;
   username: string;
   first_name: string;
-  last_name: string;
   bio: string;
   avatar: string;
   favorite_game: string | null;
@@ -19,20 +18,32 @@ interface PartnerCardProps {
   partner: Partner;
   onSendRequest: (id: string) => void;
   onRemoveFriend: (id: string) => void;
-  isAuthenticated: boolean; // Добавили пропс
+  isAuthenticated: boolean;
+  currentUserId?: string;
 }
 
 const PartnerCard: React.FC<PartnerCardProps> = ({ 
   partner, 
   onSendRequest, 
   onRemoveFriend,
-  isAuthenticated 
+  isAuthenticated,
+  currentUserId 
 }) => {
-  const getFullName = () => {
-    return `${partner.first_name} ${partner.last_name}`;
+  const getDisplayName = () => {
+    return partner.first_name || partner.username;
   };
 
+  const isCurrentUser = currentUserId && partner.id === currentUserId;
+
   const renderActionButton = () => {
+    if (isCurrentUser) {
+      return (
+        <div className="btn-disabled btn-sm">
+          Это вы
+        </div>
+      );
+    }
+
     if (!isAuthenticated) {
       return (
         <Link to="/login" className="btn btn-primary btn-sm">
@@ -80,7 +91,7 @@ const PartnerCard: React.FC<PartnerCardProps> = ({
           onError={handleImageError}
         />
         <div className="partner-info">
-          <h3 className="partner-name">{getFullName()}</h3>
+          <h3 className="partner-name">{getDisplayName()}</h3>
           <div className="partner-username">@{partner.username}</div>
         </div>
       </div>
@@ -102,6 +113,7 @@ const PartnerCard: React.FC<PartnerCardProps> = ({
           {renderActionButton()}
         </div>
         <div className="footer-right">
+          {/* Кнопка "Перейти в профиль" всегда ведёт на страницу партнера, независимо от авторизации */}
           <Link to={`/partner/${partner.id}`} className="btn btn-outline btn-sm">
             Перейти в профиль
           </Link>

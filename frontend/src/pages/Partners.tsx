@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
 import { partnersAPI } from '../services/api';
 import PartnerCard from '../components/partners/PartnerCard';
 import Header from '../components/common/Header';
@@ -7,11 +6,11 @@ import Footer from '../components/common/Footer';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/Partners.css';
 
+// Убираем last_name из интерфейса Partner
 interface Partner {
   id: string;
   username: string;
   first_name: string;
-  last_name: string;
   bio: string;
   avatar: string;
   favorite_game: string | null;
@@ -26,56 +25,56 @@ const Partners: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [gameFilter, setGameFilter] = useState('');
 
-  useEffect(() => {
-    loadPartners();
-  }, []);
-
-  useEffect(() => {
-    let filtered = partners;
-
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(partner => 
-        partner.username.toLowerCase().includes(query) ||
-        partner.first_name.toLowerCase().includes(query) ||
-        partner.last_name.toLowerCase().includes(query)
-      );
-    }
-
-    if (gameFilter) {
-      filtered = filtered.filter(partner => 
-        partner.favorite_game === gameFilter
-      );
-    }
-
-    setFilteredPartners(filtered);
-  }, [searchQuery, gameFilter, partners]);
-
-  const loadPartners = async () => {
+  const loadPartners = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       console.log('Загрузка партнеров...');
       const response = await partnersAPI.getAll();
       console.log('Партнеры загружены:', response.data);
-      setPartners(response.data);
-      setFilteredPartners(response.data);
+      
+      let partnersList = response.data;
+      if (user && user.id) {
+        const currentUserId = String(user.id);
+        partnersList = partnersList.filter((partner: Partner) => partner.id !== currentUserId);
+        console.log('Убран текущий пользователь из списка');
+      }
+      
+      setPartners(partnersList);
+      setFilteredPartners(partnersList);
     } catch (err: any) {
       console.error('Ошибка загрузки партнеров:', err);
       setError('Не удалось загрузить партнеров. Попробуйте позже.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadPartners();
+  }, [loadPartners]);
+
+  const applyFilters = useCallback((partnersList: Partner[], search: string) => {
+    let filtered = [...partnersList];
+
+    if (search.trim() !== '') {
+      const query = search.toLowerCase();
+      filtered = filtered.filter(partner => 
+        partner.username.toLowerCase().includes(query) ||
+        partner.first_name.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredPartners(filtered);
+  }, []);
+
+  useEffect(() => {
+    applyFilters(partners, searchQuery);
+  }, [searchQuery, partners, applyFilters]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-  };
-
-  const handleGameFilter = (game: string) => {
-    setGameFilter(game === gameFilter ? '' : game);
   };
 
   const handleSendFriendRequest = async (partnerId: string) => {
@@ -84,14 +83,29 @@ const Partners: React.FC = () => {
       return;
     }
 
+    if (user && String(user.id) === partnerId) {
+      alert('Нельзя отправить запрос в друзья самому себе');
+      return;
+    }
+
     try {
       await partnersAPI.sendFriendRequest(partnerId);
-      setPartners(prev => prev.map(p => 
-        p.id === partnerId ? { ...p, friendship_status: 'pending' } : p
-      ));
+      
+      const updatedPartners = partners.map(p => 
+        p.id === partnerId ? { ...p, friendship_status: 'pending' as const } : p
+      );
+      setPartners(updatedPartners);
     } catch (err: any) {
       console.error('Error sending friend request:', err);
-      alert(err.response?.data?.detail || 'Ошибка при отправке запроса');
+      if (err.response?.data?.detail === 'Запрос в друзья уже существует' || 
+          err.response?.data?.detail === 'Запрос в друзья уже отправлен') {
+        const updatedPartners = partners.map(p => 
+          p.id === partnerId ? { ...p, friendship_status: 'pending' as const } : p
+        );
+        setPartners(updatedPartners);
+      } else {
+        alert(err.response?.data?.detail || 'Ошибка при отправке запроса');
+      }
     }
   };
 
@@ -103,13 +117,21 @@ const Partners: React.FC = () => {
 
     try {
       await partnersAPI.removeFriend(partnerId);
-      setPartners(prev => prev.map(p => 
+      
+      const updatedPartners = partners.map(p => 
         p.id === partnerId ? { ...p, is_friend: false, friendship_status: null } : p
-      ));
+      );
+      setPartners(updatedPartners);
+      
+      alert('Пользователь удален из друзей');
     } catch (err: any) {
       console.error('Error removing friend:', err);
       alert(err.response?.data?.detail || 'Ошибка при удалении из друзей');
     }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
   };
 
   return (
@@ -129,7 +151,7 @@ const Partners: React.FC = () => {
             <div className="search-container">
               <input
                 type="text"
-                placeholder="Поиск по имени, фамилии или username..."
+                placeholder="Поиск по имени или username..."
                 value={searchQuery}
                 onChange={handleSearch}
                 className="partners-search"
@@ -142,7 +164,7 @@ const Partners: React.FC = () => {
               </span>
               {searchQuery && (
                 <button 
-                  onClick={() => setSearchQuery('')}
+                  onClick={clearSearch}
                   className="clear-search-btn"
                 >
                   Очистить поиск
@@ -173,13 +195,10 @@ const Partners: React.FC = () => {
                 <p>Попробуйте изменить параметры поиска</p>
               )}
               <button 
-                onClick={() => {
-                  setSearchQuery('');
-                  setGameFilter('');
-                }}
+                onClick={clearSearch}
                 className="btn btn-primary"
               >
-                Сбросить фильтры
+                Сбросить поиск
               </button>
             </div>
           ) : (
@@ -191,6 +210,7 @@ const Partners: React.FC = () => {
                   onSendRequest={handleSendFriendRequest}
                   onRemoveFriend={handleRemoveFriend}
                   isAuthenticated={isAuthenticated}
+                  currentUserId={user?.id ? String(user.id) : undefined}
                 />
               ))}
             </div>

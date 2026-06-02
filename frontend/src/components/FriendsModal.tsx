@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { friendsAPI } from '../services/api';
+import { partnersAPI } from '../services/api';
 import type { Friend, FriendRequest } from '../services/api';
+import { getAvatarUrl, handleImageError } from '../utils/avatar';
 
 interface FriendsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  currentUserId?: string;
 }
 
-const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'friends' | 'requests' | 'followers'>('friends');
+const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, currentUserId }) => {
+  const [activeTab, setActiveTab] = useState<'friends' | 'requests'>('friends');
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,17 +19,18 @@ const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) => {
     if (isOpen) {
       fetchData();
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeTab, currentUserId]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       
-      if (activeTab === 'friends') {
-        const response = await friendsAPI.getFriends();
+      if (activeTab === 'friends' && currentUserId) {
+        const response = await partnersAPI.getUserFriends(currentUserId);
         setFriends(response.data);
       } else if (activeTab === 'requests') {
-        const response = await friendsAPI.getFriendRequests();
+        const response = await partnersAPI.getFriendRequests();
+        console.log('Запросы:', response.data);
         setRequests(response.data);
       }
     } catch (error) {
@@ -39,198 +42,124 @@ const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose }) => {
 
   const handleAcceptRequest = async (requestId: number) => {
     try {
-      // Проверяем, есть ли такой метод в API
-      if (friendsAPI.acceptFriendRequest) {
-        await friendsAPI.acceptFriendRequest();
-      } else {
-        console.log('Accept request (fallback):', requestId);
-        // Временно просто обновляем данные
-        fetchData();
-      }
+      await partnersAPI.acceptFriendRequest(requestId);
+      await fetchData();
+      alert('Запрос принят');
     } catch (error) {
       console.error('Error accepting request:', error);
+      alert('Ошибка при принятии запроса');
     }
   };
 
   const handleRejectRequest = async (requestId: number) => {
     try {
-      if (friendsAPI.rejectFriendRequest) {
-        await friendsAPI.rejectFriendRequest();
-      } else {
-        console.log('Reject request (fallback):', requestId);
-        fetchData();
-      }
+      await partnersAPI.rejectFriendRequest(requestId);
+      await fetchData();
+      alert('Запрос отклонен');
     } catch (error) {
       console.error('Error rejecting request:', error);
+      alert('Ошибка при отклонении запроса');
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        background: 'white',
-        borderRadius: '10px',
-        padding: '20px',
-        width: '500px',
-        maxWidth: '90%',
-        maxHeight: '80%',
-        overflow: 'auto'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0 }}>Друзья и подписчики</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>×</button>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">Друзья</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <div className="modal-tabs">
           <button 
+            className={`tab-btn ${activeTab === 'friends' ? 'active' : ''}`}
             onClick={() => setActiveTab('friends')}
-            style={{
-              padding: '10px 20px',
-              background: activeTab === 'friends' ? '#007bff' : '#f0f0f0',
-              color: activeTab === 'friends' ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
           >
-            Друзья
+            Друзья ({friends.length})
           </button>
           <button 
+            className={`tab-btn ${activeTab === 'requests' ? 'active' : ''}`}
             onClick={() => setActiveTab('requests')}
-            style={{
-              padding: '10px 20px',
-              background: activeTab === 'requests' ? '#007bff' : '#f0f0f0',
-              color: activeTab === 'requests' ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
           >
-            Запросы
-          </button>
-          <button 
-            onClick={() => setActiveTab('followers')}
-            style={{
-              padding: '10px 20px',
-              background: activeTab === 'followers' ? '#007bff' : '#f0f0f0',
-              color: activeTab === 'followers' ? 'white' : 'black',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            Подписчики
+            Запросы ({requests.length})
           </button>
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px' }}>Загрузка...</div>
+          <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p>Загрузка...</p>
+          </div>
         ) : activeTab === 'friends' ? (
-          <div>
-            <h3>Друзья ({friends.length})</h3>
+          <div className="friends-list">
             {friends.length === 0 ? (
-              <p>У вас пока нет друзей</p>
-            ) : (
-              <div>
-                {friends.map(friend => (
-                  <div key={friend.id} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    padding: '10px',
-                    borderBottom: '1px solid #eee'
-                  }}>
-                    <img 
-                      src={friend.avatar || '/default-avatar.png'} 
-                      alt={friend.username}
-                      style={{ width: '40px', height: '40px', borderRadius: '50%', marginRight: '10px' }}
-                    />
-                    <div>
-                      <p style={{ margin: 0, fontWeight: 'bold' }}>{friend.username}</p>
-                      <p style={{ margin: 0, color: '#666' }}>{friend.first_name} {friend.last_name}</p>
-                    </div>
-                  </div>
-                ))}
+              <div className="empty-state">
+                <p>У вас пока нет друзей</p>
               </div>
+            ) : (
+              friends.map(friend => (
+                <div key={friend.id} className="friend-item">
+                  <img 
+                    src={getAvatarUrl(friend.avatar)} 
+                    alt={friend.username}
+                    className="friend-avatar"
+                    onError={handleImageError}
+                  />
+                  <div className="friend-info">
+                    <p className="friend-name">{friend.first_name}</p>
+                    <p className="friend-username">@{friend.username}</p>
+                  </div>
+                </div>
+              ))
             )}
           </div>
-        ) : activeTab === 'requests' ? (
-          <div>
-            <h3>Запросы в друзья ({requests.length})</h3>
+        ) : (
+          <div className="requests-list">
             {requests.length === 0 ? (
-              <p>Нет новых запросов</p>
+              <div className="empty-state">
+                <p>Нет новых запросов</p>
+              </div>
             ) : (
-              <div>
-                {requests.map(request => (
-                  <div key={request.id} style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
-                    padding: '10px',
-                    borderBottom: '1px solid #eee'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <img 
-                        src={request.from_user?.avatar || '/default-avatar.png'} 
-                        alt={request.from_user?.username || 'User'}
-                        style={{ width: '40px', height: '40px', borderRadius: '50%', marginRight: '10px' }}
-                      />
-                      <div>
-                        <p style={{ margin: 0, fontWeight: 'bold' }}>{request.from_user?.username || 'Unknown'}</p>
-                        <p style={{ margin: 0, color: '#666' }}>
-                          {request.from_user?.first_name || ''} {request.from_user?.last_name || ''}
-                        </p>
-                      </div>
+              requests.map(request => {
+                // Используем поле user (оно есть в типе FriendRequest)
+                const sender = request.user;
+                if (!sender) {
+                  console.log('Нет отправителя для запроса:', request);
+                  return null;
+                }
+                
+                return (
+                  <div key={request.id} className="request-item">
+                    <img 
+                      src={getAvatarUrl(sender.avatar)} 
+                      alt={sender.username}
+                      className="request-avatar"
+                      onError={handleImageError}
+                    />
+                    <div className="request-info">
+                      <p className="request-name">{sender.first_name}</p>
+                      <p className="request-username">@{sender.username}</p>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    <div className="request-actions">
                       <button 
+                        className="accept-btn"
                         onClick={() => handleAcceptRequest(request.id)}
-                        style={{
-                          padding: '5px 15px',
-                          background: '#28a745',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: 'pointer'
-                        }}
                       >
                         Принять
                       </button>
                       <button 
+                        className="reject-btn"
                         onClick={() => handleRejectRequest(request.id)}
-                        style={{
-                          padding: '5px 15px',
-                          background: '#dc3545',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '3px',
-                          cursor: 'pointer'
-                        }}
                       >
                         Отклонить
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })
             )}
-          </div>
-        ) : (
-          <div>
-            <h3>Подписчики</h3>
-            <p>Функционал подписчиков будет добавлен позже</p>
           </div>
         )}
       </div>

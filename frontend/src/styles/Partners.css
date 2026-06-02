@@ -140,9 +140,12 @@
 /* Сетка партнеров */
 .partners-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 25px;
   margin-bottom: 40px;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Карточка партнера */
@@ -157,6 +160,10 @@
   height: auto;
   min-height: 380px;
   position: relative;
+  max-width: 360px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .partner-card:hover {
@@ -318,15 +325,17 @@
   transform: translateY(-2px);
 }
 
+/* Кнопка "Удалить из друзей" - нейтральный стиль (не красный) */
 .btn-danger {
-  background: var(--error-color);
-  color: white;
+  background: var(--secondary-bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
 }
 
-.btn-danger:hover {
-  background: var(--error-color-dark);
+.btn-danger:hover:not(:disabled) {
+  background: var(--border-color);
+  color: var(--text-primary);
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
 }
 
 .btn-outline {
@@ -543,5 +552,68 @@
   .filter-btn {
     padding: 6px 15px;
     font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 580px) {
+  .partner-card-footer {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .footer-left,
+  .footer-right {
+    width: auto;
+  }
+  
+  .partner-card-footer .btn-sm {
+    width: auto;
+    min-width: 160px;
+  }
+}
+
+/* Для больших экранов - карточки не растягиваются */
+@media (min-width: 1200px) {
+  .partners-grid {
+    grid-template-columns: repeat(3, 1fr);
+    justify-items: center;
+  }
+  
+  .partner-card {
+    width: 100%;
+    max-width: 340px;
+  }
+}
+
+/* Для средних экранов */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .partners-grid {
+    grid-template-columns: repeat(2, 1fr);
+    justify-items: center;
+  }
+  
+  .partner-card {
+    max-width: 340px;
+  }
+}
+
+/* Для мобильных экранов - карточки уже, но не на всю ширину */
+@media (max-width: 767px) {
+  .partners-grid {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 20px;
+  }
+  
+  .partner-card {
+    max-width: 320px;
+    width: 100%;
+  }
+}
+
+/* Для очень маленьких экранов */
+@media (max-width: 480px) {
+  .partner-card {
+    max-width: 300px;
   }
 }

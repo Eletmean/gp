@@ -1,160 +1,193 @@
-import React from 'react';
-import { Formik, Form, Field, ErrorMessage, FormikHelpers } from 'formik';
-import * as Yup from 'yup';
+import React, { useState } from 'react';
 import { authAPI, login } from '../services/api';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
-import { useAuth } from '../contexts/AuthContext';
 import '../styles/Auth.css';
 
-interface RegisterFormValues {
-  email: string;
-  username: string;
-  first_name: string;
-  last_name: string;
-  password: string;
-}
-
-const RegisterSchema = Yup.object().shape({
-  email: Yup.string().email('Некорректный email').required('Обязательное поле'),
-  username: Yup.string().min(3, 'Минимум 3 символа').required('Обязательное поле'),
-  first_name: Yup.string().required('Обязательное поле'),
-  last_name: Yup.string().required('Обязательное поле'),
-  password: Yup.string().min(8, 'Минимум 8 символов').required('Обязательное поле'),
-});
-
 const Register: React.FC = () => {
-  const { logout } = useAuth(); // используем logout из контекста (на случай если нужно)
+  const [formData, setFormData] = useState({
+    email: '',
+    username: '',
+    first_name: '',
+    password: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSubmit = async (
-    values: RegisterFormValues, 
-    { setSubmitting, setErrors }: FormikHelpers<RegisterFormValues>
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    // Очищаем ошибку при вводе
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.email) {
+      newErrors.email = 'Email обязателен';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Введите корректный email (пример: example@mail.com)';
+    }
+    
+    if (!formData.username) {
+      newErrors.username = 'Никнейм обязателен';
+    } else if (formData.username.length < 3) {
+      newErrors.username = 'Никнейм должен содержать минимум 3 символа';
+    }
+    
+    if (!formData.first_name) {
+      newErrors.first_name = 'Имя обязательно';
+    } else if (formData.first_name.length < 2) {
+      newErrors.first_name = 'Имя должно содержать минимум 2 буквы';
+    }
+    
+    if (!formData.password) {
+      newErrors.password = 'Пароль обязателен';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Пароль: минимум 8 символов, включая A-Z, a-z, 0-9, !@#$%^&*';
+    } else if (!/[A-Z]/.test(formData.password)) {
+      newErrors.password = 'Пароль: минимум 8 символов, включая A-Z, a-z, 0-9, !@#$%^&*';
+    } else if (!/[a-z]/.test(formData.password)) {
+      newErrors.password = 'Пароль: минимум 8 символов, включая A-Z, a-z, 0-9, !@#$%^&*';
+    } else if (!/[0-9]/.test(formData.password)) {
+      newErrors.password = 'Пароль: минимум 8 символов, включая A-Z, a-z, 0-9, !@#$%^&*';
+    } else if (!/[!@#$%^&*]/.test(formData.password)) {
+      newErrors.password = 'Пароль: минимум 8 символов, включая A-Z, a-z, 0-9, !@#$%^&*';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    setLoading(true);
+    setErrors({});
+    
     try {
-      console.log('Отправка данных регистрации:', values);
+      console.log('Отправка данных регистрации:', formData);
       
-      // 1. Регистрация
-      await authAPI.register(values);
+      await authAPI.register(formData);
       console.log('Регистрация успешна, выполняем вход...');
       
-      // 2. Автоматический вход после регистрации
-      const userData = await login(values.email, values.password);
+      const userData = await login(formData.email, formData.password);
       console.log('Вход выполнен, пользователь:', userData);
       
-      // 3. Перенаправление на профиль
       window.location.href = '/profile';
     } catch (error: any) {
       console.error('Ошибка регистрации:', error);
       
-      // Обработка ошибок от FastAPI
-      if (error.response?.data?.detail) {
-        // Если есть детальное сообщение
-        setErrors({ email: error.response.data.detail });
-      } else if (error.response?.data) {
-        // Если пришли ошибки полей
-        const fieldErrors: any = {};
-        if (error.response.data.email) fieldErrors.email = error.response.data.email;
-        if (error.response.data.username) fieldErrors.username = error.response.data.username;
-        if (error.response.data.password) fieldErrors.password = error.response.data.password;
-        setErrors(fieldErrors);
+      if (error.response?.status === 400) {
+        const detail = error.response.data?.detail;
+        if (detail && detail.includes('email')) {
+          setErrors({ email: 'Пользователь с таким email уже существует' });
+        } else if (detail && detail.includes('username') || detail && detail.includes('именем')) {
+          setErrors({ username: 'Пользователь с таким никнеймом уже существует' });
+        } else {
+          setErrors({ email: detail || 'Ошибка регистрации' });
+        }
+      } else if (error.response?.status === 422) {
+        setErrors({ email: 'Проверьте правильность введенных данных' });
+      } else if (error.code === 'ERR_NETWORK') {
+        setErrors({ email: 'Ошибка соединения с сервером' });
       } else {
         setErrors({ email: 'Ошибка регистрации. Попробуйте снова.' });
       }
+    } finally {
+      setLoading(false);
     }
-    setSubmitting(false);
   };
 
   return (
     <div className="page-wrapper">
-      <Header /> {/* Header теперь сам получает данные из контекста */}
+      <Header />
       
       <main className="main-content">
         <div className="auth-container">
           <div className="auth-card">
             <h2 className="auth-title">Регистрация</h2>
-            <Formik
-              initialValues={{
-                email: '',
-                username: '',
-                first_name: '',
-                last_name: '',
-                password: '',
-              }}
-              validationSchema={RegisterSchema}
-              onSubmit={handleSubmit}
-            >
-              {({ isSubmitting, errors, touched }) => (
-                <Form className="auth-form">
-                  <div className="form-group">
-                    <label htmlFor="email">Email</label>
-                    <Field 
-                      id="email"
-                      type="email" 
-                      name="email" 
-                      placeholder="Введите email" 
-                      className={touched.email && errors.email ? 'error-input' : ''}
-                    />
-                    <ErrorMessage name="email" component="div" className="error" />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="username">Имя пользователя</label>
-                    <Field 
-                      id="username"
-                      type="text" 
-                      name="username" 
-                      placeholder="Введите имя пользователя" 
-                      className={touched.username && errors.username ? 'error-input' : ''}
-                    />
-                    <ErrorMessage name="username" component="div" className="error" />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="first_name">Имя</label>
-                    <Field 
-                      id="first_name"
-                      type="text" 
-                      name="first_name" 
-                      placeholder="Введите ваше имя" 
-                      className={touched.first_name && errors.first_name ? 'error-input' : ''}
-                    />
-                    <ErrorMessage name="first_name" component="div" className="error" />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="last_name">Фамилия</label>
-                    <Field 
-                      id="last_name"
-                      type="text" 
-                      name="last_name" 
-                      placeholder="Введите вашу фамилию" 
-                      className={touched.last_name && errors.last_name ? 'error-input' : ''}
-                    />
-                    <ErrorMessage name="last_name" component="div" className="error" />
-                  </div>
-                  
-                  <div className="form-group">
-                    <label htmlFor="password">Пароль</label>
-                    <Field 
-                      id="password"
-                      type="password" 
-                      name="password" 
-                      placeholder="Введите пароль" 
-                      className={touched.password && errors.password ? 'error-input' : ''}
-                    />
-                    <ErrorMessage name="password" component="div" className="error" />
-                  </div>
-                  
-                  <button type="submit" disabled={isSubmitting} className="auth-button">
-                    {isSubmitting ? 'Регистрация...' : 'Зарегистрироваться'}
-                  </button>
-                  
-                  <div className="auth-links">
-                    Уже есть аккаунт? <a href="/login">Войти</a>
-                  </div>
-                </Form>
-              )}
-            </Formik>
+            
+            <form onSubmit={handleSubmit} className="auth-form">
+              <div className="form-group">
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="example@mail.com"
+                  className={errors.email ? 'error-input' : ''}
+                />
+                {errors.email && <div className="error">{errors.email}</div>}
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="username">Никнейм (логин)</label>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  value={formData.username}
+                  onChange={handleChange}
+                  placeholder="Введите никнейм"
+                  className={errors.username ? 'error-input' : ''}
+                />
+                {errors.username && <div className="error">{errors.username}</div>}
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="first_name">Имя</label>
+                <input
+                  id="first_name"
+                  name="first_name"
+                  type="text"
+                  value={formData.first_name}
+                  onChange={handleChange}
+                  placeholder="Введите ваше имя"
+                  className={errors.first_name ? 'error-input' : ''}
+                />
+                {errors.first_name && <div className="error">{errors.first_name}</div>}
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="password">Пароль</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Введите пароль"
+                  className={errors.password ? 'error-input' : ''}
+                />
+                {errors.password && <div className="error password-error">{errors.password}</div>}
+              </div>
+              
+              <button 
+                type="submit" 
+                disabled={loading} 
+                className="auth-button"
+              >
+                {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+              </button>
+              
+              <div className="auth-links">
+                Уже есть аккаунт? <a href="/login">Войти</a>
+              </div>
+            </form>
           </div>
         </div>
       </main>

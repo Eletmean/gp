@@ -3,23 +3,39 @@ import { Link } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
 import '../styles/Games.css';
-import { gamesAPI, Game } from '../services/api';
+import { gamesAPI, Game, partnersAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { getAvatarUrl, handleImageError } from '../utils/avatar';
+
+interface Partner {
+  id: string;
+  username: string;
+  first_name: string;
+  bio: string;
+  avatar: string;
+  favorite_game: string | null;
+  is_friend: boolean;
+  friendship_status: 'pending' | 'accepted' | 'rejected' | null;
+}
 
 const Games: React.FC = () => {
-  const { user } = useAuth(); // получаем пользователя из контекста
+  const { user, isAuthenticated } = useAuth();
   const [games, setGames] = useState<Game[]>([]);
   const [filteredGames, setFilteredGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const [gamePlayers, setGamePlayers] = useState<Partner[]>([]);
+  const [showPlayersModal, setShowPlayersModal] = useState(false);
+  const [loadingPlayers, setLoadingPlayers] = useState(false);
 
   useEffect(() => {
     fetchGames();
   }, []);
 
   useEffect(() => {
-    // Фильтрация игр по поисковому запросу
     if (searchQuery.trim() === '') {
       setFilteredGames(games);
     } else {
@@ -51,16 +67,31 @@ const Games: React.FC = () => {
     }
   };
 
+  const findPlayersByGame = async (game: Game) => {
+    // Убираем проверку авторизации
+    setSelectedGame(game);
+    setLoadingPlayers(true);
+    setShowPlayersModal(true);
+    
+    try {
+      const response = await partnersAPI.getAll();
+      const players = response.data.filter(partner => 
+        partner.favorite_game === game.name
+      );
+      setGamePlayers(players);
+    } catch (error) {
+      console.error('Error loading players:', error);
+    } finally {
+      setLoadingPlayers(false);
+    }
+  };
+
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   };
 
-  const handleFindPlayer = (gameId: number) => {
-    if (!user) {
-      alert('Для поиска игроков необходимо войти в систему');
-      return;
-    }
-    alert(`Поиск игроков для игры ID: ${gameId} (функционал в разработке)`);
+  const handleFindPlayer = (game: Game) => {
+    findPlayersByGame(game);
   };
 
   return (
@@ -76,7 +107,6 @@ const Games: React.FC = () => {
             </p>
           </div>
 
-          {/* Поиск и фильтры */}
           <div className="games-controls">
             <div className="search-container">
               <input
@@ -132,7 +162,6 @@ const Games: React.FC = () => {
               </button>
             </div>
           ) : (
-            // Сетка игр - все на одной странице
             <div className="games-grid">
               {filteredGames.map((game) => (
                 <div key={game.id} className="game-card">
@@ -147,10 +176,10 @@ const Games: React.FC = () => {
                     />
                     <div className="game-overlay">
                       <button 
-                        onClick={() => handleFindPlayer(game.id)}
+                        onClick={() => handleFindPlayer(game)}
                         className="game-action-btn find-player-btn"
                       >
-                        👥 Найти игрока
+                        Найти игрока
                       </button>
                     </div>
                   </div>
@@ -160,7 +189,7 @@ const Games: React.FC = () => {
                     
                     <div className="game-actions">
                       <button 
-                        onClick={() => handleFindPlayer(game.id)}
+                        onClick={() => handleFindPlayer(game)}
                         className="btn btn-primary"
                       >
                         Найти игрока
@@ -173,6 +202,65 @@ const Games: React.FC = () => {
           )}
         </div>
       </main>
+
+      {showPlayersModal && (
+        <div className="modal-overlay" onClick={() => setShowPlayersModal(false)}>
+          <div className="modal-content players-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">
+                Игроки в {selectedGame?.name}
+              </h2>
+              <button 
+                className="modal-close"
+                onClick={() => setShowPlayersModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              {loadingPlayers ? (
+                <div className="loading-players">
+                  <div className="loading-spinner-small"></div>
+                  <p>Загрузка игроков...</p>
+                </div>
+              ) : gamePlayers.length === 0 ? (
+                <div className="no-players">
+                  <p>Игроки, которые играют в {selectedGame?.name}, не найдены</p>
+                  <p className="no-players-hint">Попробуйте поискать в других играх</p>
+                </div>
+              ) : (
+                <div className="players-list">
+                  {gamePlayers.map(player => (
+                    <div key={player.id} className="player-item">
+                      <img 
+                        src={getAvatarUrl(player.avatar)} 
+                        alt={player.username}
+                        className="player-avatar"
+                        onError={handleImageError}
+                      />
+                      <div className="player-info">
+                        <div className="player-name">{player.first_name || player.username}</div>
+                        <div className="player-username">@{player.username}</div>
+                        {player.bio && (
+                          <div className="player-bio">{player.bio.substring(0, 60)}...</div>
+                        )}
+                      </div>
+                      <Link 
+                        to={`/partner/${player.id}`} 
+                        className="btn btn-outline btn-sm"
+                        onClick={() => setShowPlayersModal(false)}
+                      >
+                        Профиль
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       
       <Footer />
     </div>
