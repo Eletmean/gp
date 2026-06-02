@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/';
+// Исправлено: теперь URL всегда заканчивается на /api
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = `${API_BASE_URL}/api/`;
 
 // ===== ТИПЫ =====
 
@@ -352,74 +354,74 @@ export const gamesAPI = {
 // ===== POSTS API =====
 export const postsAPI = {
   getPosts: (page = 1, perPage = 10) => 
-    api.get<PostListResponse>('/posts/', { params: { page, per_page: perPage } }),
+    api.get<PostListResponse>('posts/', { params: { page, per_page: perPage } }),
   
   getUserPosts: (userId: string, page = 1, perPage = 10) => 
-    api.get<PostListResponse>(`/posts/user/${userId}`, { params: { page, per_page: perPage } }),
+    api.get<PostListResponse>(`posts/user/${userId}`, { params: { page, per_page: perPage } }),
   
   getUserGallery: (userId: string) => 
-    api.get<GalleryImage[]>(`/posts/user/${userId}/gallery`),
+    api.get<GalleryImage[]>(`posts/user/${userId}/gallery`),
   
   getPost: (postId: number) => 
-    api.get<Post>(`/posts/${postId}`),
+    api.get<Post>(`posts/${postId}`),
   
   createPost: (formData: FormData) => 
-    api.post<Post>('/posts/', formData, {
+    api.post<Post>('posts/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     }),
   
   updatePost: (postId: number, data: { content?: string; privacy?: string }) => 
-    api.put<Post>(`/posts/${postId}`, data),
+    api.put<Post>(`posts/${postId}`, data),
   
   deletePost: (postId: number) => 
-    api.delete(`/posts/${postId}`),
+    api.delete(`posts/${postId}`),
   
   likePost: (postId: number) => 
-    api.post(`/posts/${postId}/like`),
+    api.post(`posts/${postId}/like`),
   
   unlikePost: (postId: number) => 
-    api.delete(`/posts/${postId}/like`),
+    api.delete(`posts/${postId}/like`),
   
   addComment: (postId: number, content: string, parentId?: number) => 
-    api.post<Comment>(`/posts/${postId}/comments`, { content }, { params: parentId ? { parent_id: parentId } : {} }),
+    api.post<Comment>(`posts/${postId}/comments`, { content }, { params: parentId ? { parent_id: parentId } : {} }),
   
   deleteComment: (commentId: number) => 
-    api.delete(`/posts/comments/${commentId}`),
+    api.delete(`posts/comments/${commentId}`),
 };
 
 // ===== DONATIONS API =====
 export const donationsAPI = {
   getTiers: () => 
-    api.get<SubscriptionTier[]>('/donations/tiers'),
+    api.get<SubscriptionTier[]>('donations/tiers'),
   
   getPublicTiers: () => 
-    api.get<SubscriptionTier[]>('/donations/tiers/public'),
+    api.get<SubscriptionTier[]>('donations/tiers/public'),
   
   getCustomTiers: () => 
-    api.get<UserTier[]>('/donations/tiers/custom'),
+    api.get<UserTier[]>('donations/tiers/custom'),
   
   updateTier: (tierId: number, data: { name: string; price: number; duration_days: number }) =>
-    api.put(`/donations/tiers/${tierId}`, data),
+    api.put(`donations/tiers/${tierId}`, data),
   
   subscribe: (userId: string, tierId: number) => 
-    api.post('/donations/subscribe', { user_id: userId, tier_id: tierId }),
+    api.post('donations/subscribe', { user_id: userId, tier_id: tierId }),
   
   oneTimeDonate: (userId: string, amount: number) => 
-    api.post('/donations/one-time', { user_id: userId, amount }),
+    api.post('donations/one-time', { user_id: userId, amount }),
   
   checkDonator: (userId: string) => 
-    api.get<DonatorStatus>(`/donations/check/${userId}`),
+    api.get<DonatorStatus>(`donations/check/${userId}`),
   
   getMySubscriptions: () => 
-    api.get<MySubscription[]>('/donations/my-subscriptions'),
+    api.get<MySubscription[]>('donations/my-subscriptions'),
   
   getMyDonators: () => 
-    api.get<MyDonator[]>('/donations/my-donators'),
+    api.get<MyDonator[]>('donations/my-donators'),
   
   cancelSubscription: (userId: string) => 
-    api.delete(`/donations/subscription/${userId}`),
+    api.delete(`donations/subscription/${userId}`),
 };
 
 // ===== УТИЛИТЫ =====
