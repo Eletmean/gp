@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-// ПРЯМАЯ ССЫЛКА НА БЭКЕНД (хардкод)
+// ПРЯМАЯ ССЫЛКА НА БЭКЕНД
 const API_URL = 'https://aggregation-games-backend.onrender.com/api/';
+
+console.log('API URL:', API_URL);
 
 // ===== ТИПЫ =====
 
@@ -219,6 +221,7 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log('Request URL:', config.baseURL, config.url);
     return config;
   },
   (error) => Promise.reject(error)
@@ -248,6 +251,7 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
     
+    console.error('API Error:', error.response?.status, error.response?.data);
     return Promise.reject(error);
   }
 );
@@ -338,7 +342,7 @@ export const gamesAPI = {
   getUserGames: () => api.get<UserGame[]>('games/my-games/'),
   
   getUserGamesById: (userId: string) => 
-    api.get<UserGame[]>(`/games/user/${userId}/games`),
+    api.get<UserGame[]>(`games/user/${userId}/games`),
   
   addUserGame: (data: { game_id: number; hours_played?: number }) =>
     api.post<UserGame>('games/my-games/', data),
