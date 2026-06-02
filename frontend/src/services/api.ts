@@ -1,8 +1,7 @@
 import axios from 'axios';
 
-// Исправлено: теперь URL всегда заканчивается на /api
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-const API_URL = `${API_BASE_URL}/api/`;
+// ПРЯМАЯ ССЫЛКА НА БЭКЕНД (хардкод)
+const API_URL = 'https://aggregation-games-backend.onrender.com/api/';
 
 // ===== ТИПЫ =====
 
