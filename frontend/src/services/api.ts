@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Используем относительный путь - Nginx будет проксировать
-const API_URL = '/api/';
+// ПРЯМАЯ ССЫЛКА НА БЭКЕНД
+const API_URL = 'https://aggregation-games-backend.onrender.com/api/';
 
 console.log('API URL:', API_URL);
 
